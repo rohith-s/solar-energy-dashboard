@@ -1,0 +1,93 @@
+/*
+=====================================================
+
+Solar Energy Dashboard
+
+CSS Variables
+
+Version 0.1.0
+
+=====================================================
+*/
+
+:root {
+
+    /* Brand */
+
+    --primary: #F59E0B;
+
+    --primary-dark: #D97706;
+
+    --secondary: #10B981;
+
+    --danger: #EF4444;
+
+    --info: #3B82F6;
+
+    --warning: #FACC15;
+
+    /* Background */
+
+    --background: #F8FAFC;
+
+    --surface: #FFFFFF;
+
+    --surface-hover: #F3F4F6;
+
+    /* Text */
+
+    --text: #1F2937;
+
+    --text-light: #6B7280;
+
+    /* Borders */
+
+    --border: #E5E7EB;
+
+    /* Radius */
+
+    --radius-small: 8px;
+
+    --radius: 12px;
+
+    --radius-large: 20px;
+
+    /* Shadow */
+
+    --shadow:
+
+        0 6px 18px rgba(0, 0, 0, .08);
+
+    /* Font */
+
+    --font-family:
+
+        "Roboto",
+
+        sans-serif;
+
+    /* Transition */
+
+    --transition:
+
+        .25s ease;
+
+}
+
+/* Dark Theme */
+
+[data-theme="dark"] {
+
+    --background: #111827;
+
+    --surface: #1F2937;
+
+    --surface-hover: #374151;
+
+    --text: #F9FAFB;
+
+    --text-light: #D1D5DB;
+
+    --border: #374151;
+
+}
