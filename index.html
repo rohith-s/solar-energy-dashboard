@@ -1,228 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <meta name="theme-color" content="#F59E0B">
-
-    <meta name="description" content="Solar Energy Dashboard">
-
-    <title>Solar Energy Dashboard</title>
-
-    <!-- Google Fonts -->
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-
-    <!-- Material Symbols -->
-
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
-
-    <!-- CSS -->
-
-    <link rel="stylesheet" href="css/variables.css">
-
-    <link rel="stylesheet" href="css/app.css">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="Solar Energy Dashboard for tracking solar generation, grid import and grid export.">
+  <title>Solar Energy Dashboard</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/variables.css">
+  <link rel="stylesheet" href="./css/layout.css">
+  <link rel="stylesheet" href="./css/components.css">
+  <link rel="stylesheet" href="./css/utilities.css">
+  <link rel="stylesheet" href="./css/responsive.css">
+  <link rel="stylesheet" href="./css/app.css">
 </head>
-
 <body>
-
-    <!-- App -->
-
-    <div id="app">
-
-        <!-- Header -->
-
-        <header class="top-bar">
-
-            <div class="logo">
-
-                ☀
-
-            </div>
-
-            <div class="title">
-
-                Solar Energy Dashboard
-
-            </div>
-
-            <div class="sync-status">
-
-                <span class="material-symbols-outlined">
-
-                    cloud_done
-
-                </span>
-
-            </div>
-
-        </header>
-
-        <!-- Sidebar -->
-
-        <aside class="sidebar">
-
-            <button class="menu-item active">
-
-                <span class="material-symbols-outlined">
-
-                    dashboard
-
-                </span>
-
-                Dashboard
-
-            </button>
-
-            <button class="menu-item">
-
-                <span class="material-symbols-outlined">
-
-                    add_circle
-
-                </span>
-
-                Reading
-
-            </button>
-
-            <button class="menu-item">
-
-                <span class="material-symbols-outlined">
-
-                    history
-
-                </span>
-
-                History
-
-            </button>
-
-            <button class="menu-item">
-
-                <span class="material-symbols-outlined">
-
-                    analytics
-
-                </span>
-
-                Analytics
-
-            </button>
-
-            <button class="menu-item">
-
-                <span class="material-symbols-outlined">
-
-                    settings
-
-                </span>
-
-                Settings
-
-            </button>
-
-        </aside>
-
-        <!-- Main -->
-
-        <main id="app-content">
-
-            <section class="welcome-card">
-
-                <h2>
-
-                    Welcome 👋
-
-                </h2>
-
-                <p>
-
-                    Solar Energy Dashboard is ready.
-
-                </p>
-
-                <p>
-
-                    Sprint 1 Foundation Loaded Successfully.
-
-                </p>
-
-            </section>
-
-        </main>
-
-        <!-- Mobile Bottom Navigation -->
-
-        <nav class="bottom-nav">
-
-            <button>
-
-                <span class="material-symbols-outlined">
-
-                    dashboard
-
-                </span>
-
-            </button>
-
-            <button>
-
-                <span class="material-symbols-outlined">
-
-                    add_circle
-
-                </span>
-
-            </button>
-
-            <button>
-
-                <span class="material-symbols-outlined">
-
-                    history
-
-                </span>
-
-            </button>
-
-            <button>
-
-                <span class="material-symbols-outlined">
-
-                    analytics
-
-                </span>
-
-            </button>
-
-            <button>
-
-                <span class="material-symbols-outlined">
-
-                    settings
-
-                </span>
-
-            </button>
-
-        </nav>
-
+  <a class="skip-link" href="#app-content">Skip to content</a>
+
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <button id="mobile-menu-toggle" class="icon-button mobile-only" type="button"
+                aria-label="Open navigation" aria-expanded="false" aria-controls="app-sidebar">
+          <span class="icon icon-menu" aria-hidden="true"></span>
+        </button>
+        <span class="brand-mark" aria-hidden="true">☀</span>
+        <span class="brand-name">Solar Energy Dashboard</span>
+      </div>
+      <div class="header-status">
+        <span id="header-month" class="header-month"></span>
+        <span class="status-indicator" title="Application is running">
+          <span class="status-dot" aria-hidden="true"></span>
+          Local
+        </span>
+      </div>
+    </header>
+
+    <div class="app-body">
+      <aside id="app-sidebar" class="app-sidebar" aria-label="Primary navigation">
+        <div class="sidebar-inner">
+          <button class="sidebar-close mobile-only" id="mobile-menu-close" type="button" aria-label="Close navigation">×</button>
+          <nav class="main-nav">
+            <a class="nav-item" href="#/dashboard" data-route="dashboard">
+              <span class="nav-icon" aria-hidden="true">▦</span><span>Dashboard</span>
+            </a>
+            <a class="nav-item" href="#/reading" data-route="reading">
+              <span class="nav-icon" aria-hidden="true">⊕</span><span>Reading</span>
+            </a>
+            <a class="nav-item" href="#/history" data-route="history">
+              <span class="nav-icon" aria-hidden="true">◷</span><span>History</span>
+            </a>
+            <a class="nav-item" href="#/analytics" data-route="analytics">
+              <span class="nav-icon" aria-hidden="true">▣</span><span>Analytics</span>
+            </a>
+            <a class="nav-item" href="#/settings" data-route="settings">
+              <span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span>
+            </a>
+          </nav>
+        </div>
+      </aside>
+
+      <div id="mobile-menu-backdrop" class="mobile-menu-backdrop" hidden></div>
+
+      <main id="app-content" class="app-content" tabindex="-1"></main>
     </div>
+  </div>
 
-    <!-- JavaScript -->
-
-    <script type="module" src="js/app.js"></script>
-
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script type="module" src="./js/app.js"></script>
 </body>
-
 </html>
