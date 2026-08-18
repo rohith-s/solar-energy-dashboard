@@ -4,138 +4,140 @@
    Commit 3 - Reading Form + Calculation Engine Integration
    ============================================================ */
 
+(function (window, document) {
+  "use strict";
 
-const STORAGE_KEY = "solarEnergyDashboard.readings";
+  const STORAGE_KEY = "solarEnergyDashboard.readings";
 
-/* ------------------------------------------------------------
-   Helpers
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Helpers
+     ------------------------------------------------------------ */
 
-function getReadings() {
+  function getReadings() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(STORAGE_KEY);
 
-        if (!raw) {
-            return [];
-        }
-
-        const data = JSON.parse(raw);
-
-        return Array.isArray(data) ? data : [];
-    } catch (error) {
-        console.error("Unable to read stored readings:", error);
+      if (!raw) {
         return [];
-    }
-}
+      }
 
-function saveReadings(readings) {
-    try {
-        localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify(readings)
-        );
+      const data = JSON.parse(raw);
 
-        return true;
+      return Array.isArray(data) ? data : [];
     } catch (error) {
-        console.error("Unable to save readings:", error);
-        return false;
+      console.error("Unable to read stored readings:", error);
+      return [];
     }
-}
+  }
 
-/**
- * Return the latest reading strictly before the supplied reading date.
- *
- * Important: a reading on the same date must never be used as its own
- * previous reading. This matters when an existing reading is reopened
- * or when the user enters another reading for the current date.
- */
-function getPreviousReading(readingDate, excludeId) {
+  function saveReadings(readings) {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(readings)
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Unable to save readings:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Return the latest reading strictly before the supplied reading date.
+   *
+   * Important: a reading on the same date must never be used as its own
+   * previous reading. This matters when an existing reading is reopened
+   * or when the user enters another reading for the current date.
+   */
+  function getPreviousReading(readingDate, excludeId) {
     const readings = getReadings();
 
     if (!readings.length || !readingDate) {
-        return null;
+      return null;
     }
 
     return readings
-        .filter(function (reading) {
-            if (!reading || !reading.readingDate) {
-                return false;
-            }
+      .filter(function (reading) {
+        if (!reading || !reading.readingDate) {
+          return false;
+        }
 
-            if (excludeId && reading.id === excludeId) {
-                return false;
-            }
+        if (excludeId && reading.id === excludeId) {
+          return false;
+        }
 
-            return reading.readingDate < readingDate;
-        })
-        .sort(function (a, b) {
-            if (a.readingDate !== b.readingDate) {
-                return b.readingDate.localeCompare(a.readingDate);
-            }
+        return reading.readingDate < readingDate;
+      })
+      .sort(function (a, b) {
+        if (a.readingDate !== b.readingDate) {
+          return b.readingDate.localeCompare(a.readingDate);
+        }
 
-            // Deterministic ordering if legacy data contains duplicate dates.
-            return String(b.createdAt || "").localeCompare(
-                String(a.createdAt || "")
-            );
-        })[0] || null;
-}
+        // Deterministic ordering if legacy data contains duplicate dates.
+        return String(b.createdAt || "").localeCompare(
+          String(a.createdAt || "")
+        );
+      })[0] || null;
+  }
 
-/**
- * Keep the old helper for callers that genuinely need the latest saved
- * record, while ensuring the Reading form uses getPreviousReading().
- */
-function getLatestReading() {
+  /**
+   * Keep the old helper for callers that genuinely need the latest saved
+   * record, while ensuring the Reading form uses getPreviousReading().
+   */
+  function getLatestReading() {
     const readings = getReadings();
 
     if (!readings.length) {
-        return null;
+      return null;
     }
 
     return readings
-        .slice()
-        .sort(function (a, b) {
-            if (a.readingDate !== b.readingDate) {
-                return b.readingDate.localeCompare(a.readingDate);
-            }
+      .slice()
+      .sort(function (a, b) {
+        if (a.readingDate !== b.readingDate) {
+          return b.readingDate.localeCompare(a.readingDate);
+        }
 
-            return String(b.createdAt || "").localeCompare(
-                String(a.createdAt || "")
-            );
-        })[0] || null;
-}
+        return String(b.createdAt || "").localeCompare(
+          String(a.createdAt || "")
+        );
+      })[0] || null;
+  }
 
-function formatNumber(value, decimals) {
+  function formatNumber(value, decimals) {
     const number = Number(value);
 
     if (!Number.isFinite(number)) {
-        return "0.00";
+      return "0.00";
     }
 
     return number.toLocaleString("en-IN", {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
     });
-}
+  }
 
-function formatDate(dateString) {
+  function formatDate(dateString) {
     if (!dateString) {
-        return "-";
+      return "-";
     }
 
     const date = new Date(dateString + "T00:00:00");
 
     if (Number.isNaN(date.getTime())) {
-        return dateString;
+      return dateString;
     }
 
     return date.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric"
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
     });
-}
+  }
 
-function getToday() {
+  function getToday() {
     const date = new Date();
 
     const year = date.getFullYear();
@@ -143,178 +145,188 @@ function getToday() {
     const day = String(date.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
-}
+  }
 
-function getCurrentMonth() {
+  function getCurrentMonth() {
     const date = new Date();
 
     return date.toLocaleDateString("en-IN", {
-        month: "long",
-        year: "numeric"
+      month: "long",
+      year: "numeric"
     });
-}
+  }
 
-function escapeHtml(value) {
+  function escapeHtml(value) {
     return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
 
-/* ------------------------------------------------------------
-   Reading calculations
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Reading calculations
+     ------------------------------------------------------------ */
 
-function calculateReading(current, previous) {
+  function calculateReading(current, previous) {
     const currentGridImport = Number(current.gridImport);
     const currentGridExport = Number(current.gridExport);
     const currentSolarInverter = Number(current.solarInverter);
 
     const previousGridImport = previous
-        ? Number(previous.gridImport)
-        : null;
+      ? Number(previous.gridImport)
+      : null;
 
     const previousGridExport = previous
-        ? Number(previous.gridExport)
-        : null;
+      ? Number(previous.gridExport)
+      : null;
+
+    const previousSolarInverter = previous
+      ? Number(previous.solarInverter)
+      : null;
 
     let gridImportUnits = 0;
     let gridExportUnits = 0;
+    let solarGenerationUnits = 0;
 
     if (previous) {
-        gridImportUnits =
-            currentGridImport - previousGridImport;
+      gridImportUnits =
+        currentGridImport - previousGridImport;
 
-        gridExportUnits =
-            currentGridExport - previousGridExport;
+      gridExportUnits =
+        currentGridExport - previousGridExport;
+
+      solarGenerationUnits =
+        currentSolarInverter - previousSolarInverter;
     }
 
-    // Solar inverter value is already the
-    // production for the current month.
-    const solarGenerationUnits = currentSolarInverter;
-
+    /*
+     * Prevent negative consumption values caused by
+     * accidental lower meter readings.
+     */
     gridImportUnits = Math.max(0, gridImportUnits);
     gridExportUnits = Math.max(0, gridExportUnits);
+    solarGenerationUnits = Math.max(0, solarGenerationUnits);
 
+    /*
+     * Home consumption:
+     *
+     * Solar generation
+     * + Grid import
+     * - Grid export
+     */
     const homeConsumption =
-        solarGenerationUnits +
-        gridImportUnits -
-        gridExportUnits;
+      solarGenerationUnits +
+      gridImportUnits -
+      gridExportUnits;
 
     return {
-        gridImportUnits,
-        gridExportUnits,
-        solarGenerationUnits,
-        homeConsumption: Math.max(0, homeConsumption)
+      gridImportUnits: gridImportUnits,
+      gridExportUnits: gridExportUnits,
+      solarGenerationUnits: solarGenerationUnits,
+      homeConsumption: Math.max(0, homeConsumption)
     };
-}
+  }
 
-/* ------------------------------------------------------------
-   Validation
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Validation
+     ------------------------------------------------------------ */
 
-function validateReading(values, previous) {
+  function validateReading(values, previous) {
     const errors = [];
 
     if (!values.readingDate) {
-        errors.push("Please select the reading date.");
+      errors.push("Please select the reading date.");
     }
 
     if (
-        values.gridImport === "" ||
-        !Number.isFinite(Number(values.gridImport)) ||
-        Number(values.gridImport) < 0
+      values.gridImport === "" ||
+      !Number.isFinite(Number(values.gridImport)) ||
+      Number(values.gridImport) < 0
     ) {
-        errors.push("Enter a valid Grid Import reading.");
+      errors.push("Enter a valid Grid Import reading.");
     }
 
     if (
-        values.gridExport === "" ||
-        !Number.isFinite(Number(values.gridExport)) ||
-        Number(values.gridExport) < 0
+      values.gridExport === "" ||
+      !Number.isFinite(Number(values.gridExport)) ||
+      Number(values.gridExport) < 0
     ) {
-        errors.push("Enter a valid Grid Export reading.");
+      errors.push("Enter a valid Grid Export reading.");
     }
 
     if (
-        values.solarInverter === "" ||
-        !Number.isFinite(Number(values.solarInverter)) ||
-        Number(values.solarInverter) < 0
+      values.solarInverter === "" ||
+      !Number.isFinite(Number(values.solarInverter)) ||
+      Number(values.solarInverter) < 0
     ) {
-        errors.push("Enter a valid Solar Inverter reading.");
+      errors.push("Enter a valid Solar Inverter reading.");
     }
 
     if (previous) {
-        if (
-            Number(values.gridImport) <
-            Number(previous.gridImport)
-        ) {
-            errors.push(
-                "Grid Import reading cannot be lower than the previous reading."
-            );
-        }
+      if (
+        Number(values.gridImport) <
+        Number(previous.gridImport)
+      ) {
+        errors.push(
+          "Grid Import reading cannot be lower than the previous reading."
+        );
+      }
 
-        if (
-            Number(values.gridExport) <
-            Number(previous.gridExport)
-        ) {
-            errors.push(
-                "Grid Export reading cannot be lower than the previous reading."
-            );
-        }
+      if (
+        Number(values.gridExport) <
+        Number(previous.gridExport)
+      ) {
+        errors.push(
+          "Grid Export reading cannot be lower than the previous reading."
+        );
+      }
 
-        if (
-            values.solarInverter === "" ||
-            !Number.isFinite(Number(values.solarInverter)) ||
-            Number(values.solarInverter) < 0
-        ) {
-            errors.push("Enter a valid Solar Inverter reading.");
-        }
-        if (
-            Number(values.solarInverter) <
-            Number(previous.solarInverter)
-        ) {
-            errors.push(
-                "Solar Inverter reading cannot be lower than the previous reading."
-            );
-        }
-        if (
-            values.readingDate <= previous.readingDate
-        ) {
-            errors.push(
-                "Reading date must be after the previous reading date."
-            );
-        }
+      if (
+        Number(values.solarInverter) <
+        Number(previous.solarInverter)
+      ) {
+        errors.push(
+          "Solar Inverter reading cannot be lower than the previous reading."
+        );
+      }
+
+      if (
+        values.readingDate <= previous.readingDate
+      ) {
+        errors.push(
+          "Reading date must be after the previous reading date."
+        );
+      }
     }
 
     return errors;
-}
+  }
 
-/* ------------------------------------------------------------
-   Reading form
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Reading form
+     ------------------------------------------------------------ */
 
-function renderForm() {
+  function renderForm() {
     const initialReadingDate = getToday();
     const previous = getPreviousReading(initialReadingDate);
 
     const previousDate = previous
-        ? formatDate(previous.readingDate)
-        : "No previous reading";
+      ? formatDate(previous.readingDate)
+      : "No previous reading";
 
     const previousGridImport = previous
-        ? formatNumber(previous.gridImport, 2)
-        : "—";
+      ? formatNumber(previous.gridImport, 2)
+      : "—";
 
     const previousGridExport = previous
-        ? formatNumber(previous.gridExport, 2)
-        : "—";
+      ? formatNumber(previous.gridExport, 2)
+      : "—";
 
     const previousSolarInverter = previous
-        ? formatNumber(previous.solarInverter, 2)
-        : "—";
+      ? formatNumber(previous.solarInverter, 2)
+      : "—";
 
     return `
             <section class="reading-page">
@@ -568,13 +580,13 @@ function renderForm() {
 
             </section>
         `;
-}
+  }
 
-/* ------------------------------------------------------------
-   Previous-reading display
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Previous-reading display
+     ------------------------------------------------------------ */
 
-function updatePreviousReading() {
+  function updatePreviousReading() {
     const dateInput = document.getElementById("reading-date");
     const previousDateElement = document.getElementById("previous-reading-date");
     const previousGridImportElement = document.getElementById("previous-grid-import");
@@ -582,62 +594,62 @@ function updatePreviousReading() {
     const previousSolarInverterElement = document.getElementById("previous-solar-inverter");
 
     if (
-        !dateInput ||
-        !previousDateElement ||
-        !previousGridImportElement ||
-        !previousGridExportElement ||
-        !previousSolarInverterElement
+      !dateInput ||
+      !previousDateElement ||
+      !previousGridImportElement ||
+      !previousGridExportElement ||
+      !previousSolarInverterElement
     ) {
-        return null;
+      return null;
     }
 
     const previous = getPreviousReading(dateInput.value);
 
     previousDateElement.textContent = previous
-        ? formatDate(previous.readingDate)
-        : "No previous reading";
+      ? formatDate(previous.readingDate)
+      : "No previous reading";
 
     previousGridImportElement.textContent = previous
-        ? `${formatNumber(previous.gridImport, 2)} kWh`
-        : "— kWh";
+      ? `${formatNumber(previous.gridImport, 2)} kWh`
+      : "— kWh";
 
     previousGridExportElement.textContent = previous
-        ? `${formatNumber(previous.gridExport, 2)} kWh`
-        : "— kWh";
+      ? `${formatNumber(previous.gridExport, 2)} kWh`
+      : "— kWh";
 
     previousSolarInverterElement.textContent = previous
-        ? `${formatNumber(previous.solarInverter, 2)} kWh`
-        : "— kWh";
+      ? `${formatNumber(previous.solarInverter, 2)} kWh`
+      : "— kWh";
 
     return previous;
-}
+  }
 
-/* ------------------------------------------------------------
-   Preview
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Preview
+     ------------------------------------------------------------ */
 
-function updatePreview() {
+  function updatePreview() {
     const preview = document.getElementById("reading-preview");
 
     if (!preview) {
-        return;
+      return;
     }
 
     const gridImport =
-        document.getElementById("grid-import");
+      document.getElementById("grid-import");
 
     const gridExport =
-        document.getElementById("grid-export");
+      document.getElementById("grid-export");
 
     const solarInverter =
-        document.getElementById("solar-inverter");
+      document.getElementById("solar-inverter");
 
     if (
-        !gridImport ||
-        !gridExport ||
-        !solarInverter
+      !gridImport ||
+      !gridExport ||
+      !solarInverter
     ) {
-        return;
+      return;
     }
 
     const gridImportValue = gridImport.value;
@@ -645,23 +657,23 @@ function updatePreview() {
     const solarInverterValue = solarInverter.value;
 
     if (
-        gridImportValue === "" ||
-        gridExportValue === "" ||
-        solarInverterValue === ""
+      gridImportValue === "" ||
+      gridExportValue === "" ||
+      solarInverterValue === ""
     ) {
-        preview.hidden = true;
-        return;
+      preview.hidden = true;
+      return;
     }
 
     const previous = updatePreviousReading();
 
     const calculation = calculateReading(
-        {
-            gridImport: gridImportValue,
-            gridExport: gridExportValue,
-            solarInverter: solarInverterValue
-        },
-        previous
+      {
+        gridImport: gridImportValue,
+        gridExport: gridExportValue,
+        solarInverter: solarInverterValue
+      },
+      previous
     );
 
     preview.innerHTML = `
@@ -676,8 +688,8 @@ function updatePreview() {
                     <span>Solar Generation</span>
                     <strong>
                         ${formatNumber(
-        calculation.solarGenerationUnits,
-        2
+      calculation.solarGenerationUnits,
+      2
     )} kWh
                     </strong>
                 </div>
@@ -686,8 +698,8 @@ function updatePreview() {
                     <span>Grid Import</span>
                     <strong>
                         ${formatNumber(
-        calculation.gridImportUnits,
-        2
+      calculation.gridImportUnits,
+      2
     )} kWh
                     </strong>
                 </div>
@@ -696,8 +708,8 @@ function updatePreview() {
                     <span>Grid Export</span>
                     <strong>
                         ${formatNumber(
-        calculation.gridExportUnits,
-        2
+      calculation.gridExportUnits,
+      2
     )} kWh
                     </strong>
                 </div>
@@ -706,8 +718,8 @@ function updatePreview() {
                     <span>Home Consumption</span>
                     <strong>
                         ${formatNumber(
-        calculation.homeConsumption,
-        2
+      calculation.homeConsumption,
+      2
     )} kWh
                     </strong>
                 </div>
@@ -716,103 +728,103 @@ function updatePreview() {
         `;
 
     preview.hidden = false;
-}
+  }
 
-/* ------------------------------------------------------------
-   Save reading
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Save reading
+     ------------------------------------------------------------ */
 
-function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault();
 
     const form = event.currentTarget;
 
     const values = {
-        readingDate:
-            document.getElementById("reading-date").value,
+      readingDate:
+        document.getElementById("reading-date").value,
 
-        gridImport:
-            document.getElementById("grid-import").value,
+      gridImport:
+        document.getElementById("grid-import").value,
 
-        gridExport:
-            document.getElementById("grid-export").value,
+      gridExport:
+        document.getElementById("grid-export").value,
 
-        solarInverter:
-            document.getElementById("solar-inverter").value,
+      solarInverter:
+        document.getElementById("solar-inverter").value,
 
-        isMonthEnd:
-            document.getElementById("is-month-end").checked
+      isMonthEnd:
+        document.getElementById("is-month-end").checked
     };
 
     const previous = getPreviousReading(values.readingDate);
 
     const errors = validateReading(
-        values,
-        previous
+      values,
+      previous
     );
 
     const errorContainer =
-        document.getElementById("reading-errors");
+      document.getElementById("reading-errors");
 
     if (errors.length) {
-        errorContainer.innerHTML = `
+      errorContainer.innerHTML = `
                 <strong>Please correct the following:</strong>
                 <ul>
                     ${errors
-                .map(function (error) {
-                    return `<li>${escapeHtml(error)}</li>`;
-                })
-                .join("")}
+          .map(function (error) {
+            return `<li>${escapeHtml(error)}</li>`;
+          })
+          .join("")}
                 </ul>
             `;
 
-        errorContainer.hidden = false;
+      errorContainer.hidden = false;
 
-        return;
+      return;
     }
 
     errorContainer.hidden = true;
 
     const calculation = calculateReading(
-        values,
-        previous
+      values,
+      previous
     );
 
     const reading = {
-        id:
-            "reading-" +
-            Date.now() +
-            "-" +
-            Math.random()
-                .toString(36)
-                .substring(2, 8),
+      id:
+        "reading-" +
+        Date.now() +
+        "-" +
+        Math.random()
+          .toString(36)
+          .substring(2, 8),
 
-        readingDate: values.readingDate,
+      readingDate: values.readingDate,
 
-        gridImport: Number(values.gridImport),
+      gridImport: Number(values.gridImport),
 
-        gridExport: Number(values.gridExport),
+      gridExport: Number(values.gridExport),
 
-        solarInverter: Number(values.solarInverter),
+      solarInverter: Number(values.solarInverter),
 
-        isMonthEnd: Boolean(values.isMonthEnd),
+      isMonthEnd: Boolean(values.isMonthEnd),
 
-        calculation: {
-            solarGeneration:
-                calculation.solarGenerationUnits,
+      calculation: {
+        solarGeneration:
+          calculation.solarGenerationUnits,
 
-            gridImportUnits:
-                calculation.gridImportUnits,
+        gridImportUnits:
+          calculation.gridImportUnits,
 
-            gridExportUnits:
-                calculation.gridExportUnits,
+        gridExportUnits:
+          calculation.gridExportUnits,
 
-            homeConsumption:
-                calculation.homeConsumption
-        },
+        homeConsumption:
+          calculation.homeConsumption
+      },
 
-        createdAt:
-            new Date().toISOString()
+      createdAt:
+        new Date().toISOString()
     };
 
     const readings = getReadings();
@@ -820,16 +832,16 @@ function handleSubmit(event) {
     readings.push(reading);
 
     if (!saveReadings(readings)) {
-        errorContainer.innerHTML = `
+      errorContainer.innerHTML = `
                 <strong>Unable to save reading.</strong>
                 <p>
                     Your browser storage may be unavailable.
                 </p>
             `;
 
-        errorContainer.hidden = false;
+      errorContainer.hidden = false;
 
-        return;
+      return;
     }
 
     /*
@@ -837,9 +849,9 @@ function handleSubmit(event) {
      * reading has been saved.
      */
     window.dispatchEvent(
-        new CustomEvent("solar:reading-saved", {
-            detail: reading
-        })
+      new CustomEvent("solar:reading-saved", {
+        detail: reading
+      })
     );
 
     showSuccess(reading);
@@ -847,25 +859,25 @@ function handleSubmit(event) {
     form.reset();
 
     const dateInput =
-        document.getElementById("reading-date");
+      document.getElementById("reading-date");
 
     if (dateInput) {
-        dateInput.value = getToday();
+      dateInput.value = getToday();
     }
 
     updatePreview();
-}
+  }
 
-/* ------------------------------------------------------------
-   Success message
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Success message
+     ------------------------------------------------------------ */
 
-function showSuccess(reading) {
+  function showSuccess(reading) {
     const appContent =
-        document.getElementById("app-content");
+      document.getElementById("app-content");
 
     if (!appContent) {
-        return;
+      return;
     }
 
     const message = document.createElement("div");
@@ -883,123 +895,118 @@ function showSuccess(reading) {
     document.body.appendChild(message);
 
     window.setTimeout(function () {
-        message.classList.add("is-visible");
+      message.classList.add("is-visible");
     }, 10);
 
     window.setTimeout(function () {
-        message.classList.remove("is-visible");
+      message.classList.remove("is-visible");
 
-        window.setTimeout(function () {
-            message.remove();
-        }, 300);
+      window.setTimeout(function () {
+        message.remove();
+      }, 300);
     }, 3500);
-}
+  }
 
-/* ------------------------------------------------------------
-   Event binding
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Event binding
+     ------------------------------------------------------------ */
 
-function bindEvents() {
+  function bindEvents() {
     const form =
-        document.getElementById("reading-form");
+      document.getElementById("reading-form");
 
     if (!form) {
-        return;
+      return;
     }
 
     form.addEventListener(
-        "submit",
-        handleSubmit
+      "submit",
+      handleSubmit
     );
 
     const dateInput = document.getElementById("reading-date");
 
     if (dateInput) {
-        dateInput.addEventListener("input", function () {
-            updatePreviousReading();
-            updatePreview();
-        });
-        dateInput.addEventListener("change", function () {
-            updatePreviousReading();
-            updatePreview();
-        });
+      dateInput.addEventListener("input", function () {
+        updatePreviousReading();
+        updatePreview();
+      });
+      dateInput.addEventListener("change", function () {
+        updatePreviousReading();
+        updatePreview();
+      });
     }
 
     [
-        "grid-import",
-        "grid-export",
-        "solar-inverter"
+      "grid-import",
+      "grid-export",
+      "solar-inverter"
     ].forEach(function (id) {
-        const input = document.getElementById(id);
+      const input = document.getElementById(id);
 
-        if (input) {
-            input.addEventListener(
-                "input",
-                updatePreview
-            );
-        }
+      if (input) {
+        input.addEventListener(
+          "input",
+          updatePreview
+        );
+      }
     });
 
     const cancelButton =
-        document.getElementById("reading-cancel");
+      document.getElementById("reading-cancel");
 
     if (cancelButton) {
-        cancelButton.addEventListener(
-            "click",
-            function () {
-                form.reset();
+      cancelButton.addEventListener(
+        "click",
+        function () {
+          form.reset();
 
-                const dateInput =
-                    document.getElementById("reading-date");
+          const dateInput =
+            document.getElementById("reading-date");
 
-                if (dateInput) {
-                    dateInput.value = getToday();
-                }
+          if (dateInput) {
+            dateInput.value = getToday();
+          }
 
-                updatePreview();
-            }
-        );
+          updatePreview();
+        }
+      );
     }
-}
+  }
 
-/* ------------------------------------------------------------
-   Public render function
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Public render function
+     ------------------------------------------------------------ */
 
-function render() {
+  function render() {
     return renderForm();
-}
+  }
 
-/* ------------------------------------------------------------
-   Public API
-   ------------------------------------------------------------ */
+  /* ------------------------------------------------------------
+     Public API
+     ------------------------------------------------------------ */
 
-window.SolarReading = {
+  window.SolarReading = {
     render: render,
     getReadings: getReadings,
     getLatestReading: getLatestReading,
     getPreviousReading: getPreviousReading,
     calculateReading: calculateReading
-};
+  };
 
-/*
- * app.js should call:
- *
- * appContent.innerHTML = SolarReading.render();
- * SolarReading.init();
- *
- * Keep init separate so the router can render the HTML
- * first and then attach events.
- */
+  /*
+   * app.js should call:
+   *
+   * appContent.innerHTML = SolarReading.render();
+   * SolarReading.init();
+   *
+   * Keep init separate so the router can render the HTML
+   * first and then attach events.
+   */
 
-function init() {
-
+  SolarReading.init = function () {
     bindEvents();
     updatePreview();
-};
+  };
 
-
-export {
-    calculateReading, getLatestReading, getReadings, init, render
-};
-
+})(window, document);
