@@ -104,6 +104,31 @@ function getLatestReading() {
         })[0] || null;
 }
 
+// function getPreviousReading(readingDate, excludeId) {
+//     if (!readingDate) {
+//         return null;
+//     }
+
+//     return getReadings()
+//         .filter(function (reading) {
+//             if (excludeId && reading.id === excludeId) {
+//                 return false;
+//             }
+
+//             return reading.readingDate < readingDate;
+//         })
+//         .sort(function (a, b) {
+//             if (a.readingDate !== b.readingDate) {
+//                 return b.readingDate.localeCompare(a.readingDate);
+//             }
+
+//             const aCreatedAt = new Date(a.createdAt || 0).getTime();
+//             const bCreatedAt = new Date(b.createdAt || 0).getTime();
+
+//             return bCreatedAt - aCreatedAt;
+//         })[0] || null;
+// }
+
 function formatNumber(value, decimals) {
     const number = Number(value);
 
@@ -238,13 +263,13 @@ function validateReading(values, previous) {
         errors.push("Enter a valid Grid Export reading.");
     }
 
-    if (
-        values.solarInverter === "" ||
-        !Number.isFinite(Number(values.solarInverter)) ||
-        Number(values.solarInverter) < 0
-    ) {
-        errors.push("Enter a valid Solar Inverter reading.");
-    }
+    // if (
+    //     values.solarInverter === "" ||
+    //     !Number.isFinite(Number(values.solarInverter)) ||
+    //     Number(values.solarInverter) < 0
+    // ) {
+    //     errors.push("Enter a valid Solar Inverter reading.");
+    // }
 
     if (previous) {
         if (
@@ -297,8 +322,8 @@ function validateReading(values, previous) {
    ------------------------------------------------------------ */
 
 function renderForm() {
-    const initialReadingDate = getToday();
-    const previous = getPreviousReading(initialReadingDate);
+    const readingDate = getToday();
+    const previous = getPreviousReading(readingDate);
 
     const previousDate = previous
         ? formatDate(previous.readingDate)
@@ -653,7 +678,11 @@ function updatePreview() {
         return;
     }
 
-    const previous = updatePreviousReading();
+    const readingDate =
+        document.getElementById("reading-date")?.value;
+
+    const previous = getPreviousReading(readingDate);
+
 
     const calculation = calculateReading(
         {
@@ -744,7 +773,9 @@ function handleSubmit(event) {
             document.getElementById("is-month-end").checked
     };
 
-    const previous = getPreviousReading(values.readingDate);
+    const previous = getPreviousReading(
+        values.readingDate
+    );
 
     const errors = validateReading(
         values,
@@ -895,6 +926,45 @@ function showSuccess(reading) {
     }, 3500);
 }
 
+function updatePreviousReading() {
+    const dateInput =
+        document.getElementById("reading-date");
+
+    if (!dateInput) {
+        return;
+    }
+
+    const previous =
+        getPreviousReading(dateInput.value);
+
+    const previousDate =
+        document.querySelector(
+            ".previous-reading-header p"
+        );
+
+    const previousValues =
+        document.querySelectorAll(
+            ".previous-reading-grid strong"
+        );
+
+    if (previousDate) {
+        previousDate.textContent = previous
+            ? formatDate(previous.readingDate)
+            : "No previous reading";
+    }
+
+    if (previousValues.length >= 3) {
+        previousValues[0].textContent =
+            `${previous ? formatNumber(previous.gridImport, 2) : "—"} kWh`;
+
+        previousValues[1].textContent =
+            `${previous ? formatNumber(previous.gridExport, 2) : "—"} kWh`;
+
+        previousValues[2].textContent =
+            `${previous ? formatNumber(previous.solarInverter, 2) : "—"} kWh`;
+    }
+}
+
 /* ------------------------------------------------------------
    Event binding
    ------------------------------------------------------------ */
@@ -912,13 +982,24 @@ function bindEvents() {
         handleSubmit
     );
 
-    const dateInput = document.getElementById("reading-date");
+    const dateInput =
+        document.getElementById("reading-date");
 
+    // if (dateInput) {
+    //     dateInput.addEventListener(
+    //         "change",
+    //         function () {
+    //             updatePreviousReading();
+    //             updatePreview();
+    //         }
+    //     );
+    // }
     if (dateInput) {
         dateInput.addEventListener("input", function () {
             updatePreviousReading();
             updatePreview();
         });
+
         dateInput.addEventListener("change", function () {
             updatePreviousReading();
             updatePreview();
