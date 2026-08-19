@@ -1,4 +1,5 @@
 import {
+  init as initDashboard,
   render as renderDashboard
 } from "../modules/dashboard/dashboard.js";
 
@@ -148,6 +149,9 @@ function render() {
 
     appContent.innerHTML = renderer();
 
+    if (route === "dashboard") {
+      initDashboard();
+    }
     if (route === "reading") {
       initReading();
     }

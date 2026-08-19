@@ -1,7 +1,7 @@
 # Commit 5 — History
 
 ## Status
-Planned / Next.
+Implemented in the current project.
 
 ## Purpose
 

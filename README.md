@@ -83,3 +83,6 @@ solar-energy-dashboard/
 Rohith S
 
 Co-developed with ChatGPT
+
+
+Current implementation includes Commit 5 History and Commit 6 Dashboard Real Data.
