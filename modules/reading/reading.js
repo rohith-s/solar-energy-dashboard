@@ -1,9 +1,8 @@
 /* ============================================================
    Solar Energy Dashboard
    Reading Module
-   Commit 3 - Reading Form + Calculation Engine Integration
+   Commit 4 - Previous Reading Selection & Date-Aware Calculation
    ============================================================ */
-
 
 const STORAGE_KEY = "solarEnergyDashboard.readings";
 
@@ -42,12 +41,35 @@ function saveReadings(readings) {
     }
 }
 
+/* ------------------------------------------------------------
+   Reading selection
+   ------------------------------------------------------------ */
+
 /**
- * Return the latest reading strictly before the supplied reading date.
+ * Return the latest month-end reading strictly before the
+ * supplied reading date.
  *
- * Important: a reading on the same date must never be used as its own
- * previous reading. This matters when an existing reading is reopened
- * or when the user enters another reading for the current date.
+ * IMPORTANT:
+ *
+ * Previous readings for calculations are based ONLY on
+ * month-end readings.
+ *
+ * A normal/non-month-end reading must never become the
+ * baseline for a later calculation.
+ *
+ * A reading on the same date is also excluded.
+ *
+ * Example:
+ *
+ * 31-Jul-2026 -> month-end
+ * 18-Aug-2026 -> normal reading
+ * 19-Aug-2026 -> current date
+ *
+ * Previous reading for 19-Aug = 31-Jul
+ *
+ * If 31-Aug is later saved as month-end:
+ *
+ * Previous reading for 01-Sep = 31-Aug
  */
 function getPreviousReading(readingDate, excludeId) {
     const readings = getReadings();
@@ -66,14 +88,34 @@ function getPreviousReading(readingDate, excludeId) {
                 return false;
             }
 
+            /*
+             * Only month-end readings can be used
+             * as the previous baseline.
+             */
+            if (!reading.isMonthEnd) {
+                return false;
+            }
+
+            /*
+             * The previous reading must be strictly
+             * before the selected reading date.
+             */
             return reading.readingDate < readingDate;
         })
         .sort(function (a, b) {
+            /*
+             * Latest month-end date first.
+             */
             if (a.readingDate !== b.readingDate) {
-                return b.readingDate.localeCompare(a.readingDate);
+                return b.readingDate.localeCompare(
+                    a.readingDate
+                );
             }
 
-            // Deterministic ordering if legacy data contains duplicate dates.
+            /*
+             * Deterministic ordering for legacy
+             * duplicate-date records.
+             */
             return String(b.createdAt || "").localeCompare(
                 String(a.createdAt || "")
             );
@@ -81,8 +123,12 @@ function getPreviousReading(readingDate, excludeId) {
 }
 
 /**
- * Keep the old helper for callers that genuinely need the latest saved
- * record, while ensuring the Reading form uses getPreviousReading().
+ * Return the latest saved record regardless of the date supplied.
+ *
+ * Keep this helper because other modules may genuinely need
+ * the latest saved record.
+ *
+ * The Reading form itself must use getPreviousReading().
  */
 function getLatestReading() {
     const readings = getReadings();
@@ -95,39 +141,58 @@ function getLatestReading() {
         .slice()
         .sort(function (a, b) {
             if (a.readingDate !== b.readingDate) {
-                return b.readingDate.localeCompare(a.readingDate);
+                return b.readingDate.localeCompare(
+                    a.readingDate
+                );
             }
 
-            return String(b.createdAt || "").localeCompare(
+            return String(
+                b.createdAt || ""
+            ).localeCompare(
                 String(a.createdAt || "")
             );
         })[0] || null;
 }
 
-// function getPreviousReading(readingDate, excludeId) {
-//     if (!readingDate) {
-//         return null;
-//     }
+function getLatestMonthEndReading(readingDate, excludeId) {
+    const readings = getReadings();
 
-//     return getReadings()
-//         .filter(function (reading) {
-//             if (excludeId && reading.id === excludeId) {
-//                 return false;
-//             }
+    if (!readings.length || !readingDate) {
+        return null;
+    }
 
-//             return reading.readingDate < readingDate;
-//         })
-//         .sort(function (a, b) {
-//             if (a.readingDate !== b.readingDate) {
-//                 return b.readingDate.localeCompare(a.readingDate);
-//             }
+    return readings
+        .filter(function (reading) {
+            if (!reading || !reading.readingDate) {
+                return false;
+            }
 
-//             const aCreatedAt = new Date(a.createdAt || 0).getTime();
-//             const bCreatedAt = new Date(b.createdAt || 0).getTime();
+            if (
+                excludeId &&
+                reading.id === excludeId
+            ) {
+                return false;
+            }
 
-//             return bCreatedAt - aCreatedAt;
-//         })[0] || null;
-// }
+            return (
+                reading.isMonthEnd === true &&
+                reading.readingDate < readingDate
+            );
+        })
+        .sort(function (a, b) {
+            if (a.readingDate !== b.readingDate) {
+                return b.readingDate.localeCompare(
+                    a.readingDate
+                );
+            }
+
+            return String(
+                b.createdAt || ""
+            ).localeCompare(
+                String(a.createdAt || "")
+            );
+        })[0] || null;
+}
 
 function formatNumber(value, decimals) {
     const number = Number(value);
@@ -147,7 +212,9 @@ function formatDate(dateString) {
         return "-";
     }
 
-    const date = new Date(dateString + "T00:00:00");
+    const date = new Date(
+        dateString + "T00:00:00"
+    );
 
     if (Number.isNaN(date.getTime())) {
         return dateString;
@@ -164,8 +231,14 @@ function getToday() {
     const date = new Date();
 
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+
+    const month = String(
+        date.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+        date.getDate()
+    ).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
 }
@@ -191,38 +264,61 @@ function escapeHtml(value) {
 /* ------------------------------------------------------------
    Reading calculations
    ------------------------------------------------------------ */
+function calculateReading(
+    current,
+    previous,
+    solarBaseline
+) {
+    const currentGridImport =
+        Number(current.gridImport);
 
-function calculateReading(current, previous) {
-    const currentGridImport = Number(current.gridImport);
-    const currentGridExport = Number(current.gridExport);
-    const currentSolarInverter = Number(current.solarInverter);
+    const currentGridExport =
+        Number(current.gridExport);
 
-    const previousGridImport = previous
-        ? Number(previous.gridImport)
-        : null;
-
-    const previousGridExport = previous
-        ? Number(previous.gridExport)
-        : null;
+    /*
+     * Solar inverter value is NOT cumulative.
+     *
+     * It represents the solar generation for the
+     * current month / period directly.
+     */
+    const solarGenerationUnits =
+        Number(current.solarInverter);
 
     let gridImportUnits = 0;
     let gridExportUnits = 0;
 
+    /*
+     * Grid Import and Grid Export are cumulative
+     * meter readings, so these are calculated against
+     * the previous month-end baseline.
+     */
     if (previous) {
         gridImportUnits =
-            currentGridImport - previousGridImport;
+            currentGridImport -
+            Number(previous.gridImport);
 
         gridExportUnits =
-            currentGridExport - previousGridExport;
+            currentGridExport -
+            Number(previous.gridExport);
     }
 
-    // Solar inverter value is already the
-    // production for the current month.
-    const solarGenerationUnits = currentSolarInverter;
+    /*
+     * Prevent invalid negative grid usage.
+     * Validation also catches decreasing meter readings.
+     */
+    gridImportUnits =
+        Math.max(0, gridImportUnits);
 
-    gridImportUnits = Math.max(0, gridImportUnits);
-    gridExportUnits = Math.max(0, gridExportUnits);
+    gridExportUnits =
+        Math.max(0, gridExportUnits);
 
+    /*
+     * Home Consumption formula:
+     *
+     * Solar Generation
+     * + Grid Import
+     * - Grid Export
+     */
     const homeConsumption =
         solarGenerationUnits +
         gridImportUnits -
@@ -232,7 +328,10 @@ function calculateReading(current, previous) {
         gridImportUnits,
         gridExportUnits,
         solarGenerationUnits,
-        homeConsumption: Math.max(0, homeConsumption)
+        homeConsumption: Math.max(
+            0,
+            homeConsumption
+        )
     };
 }
 
@@ -240,76 +339,93 @@ function calculateReading(current, previous) {
    Validation
    ------------------------------------------------------------ */
 
-function validateReading(values, previous) {
+function validateReading(
+    values,
+    previous,
+    solarBaseline
+) {
     const errors = [];
 
     if (!values.readingDate) {
-        errors.push("Please select the reading date.");
+        errors.push(
+            "Please select the reading date."
+        );
     }
 
     if (
         values.gridImport === "" ||
-        !Number.isFinite(Number(values.gridImport)) ||
+        !Number.isFinite(
+            Number(values.gridImport)
+        ) ||
         Number(values.gridImport) < 0
     ) {
-        errors.push("Enter a valid Grid Import reading.");
+        errors.push(
+            "Enter a valid Grid Import reading."
+        );
     }
 
     if (
         values.gridExport === "" ||
-        !Number.isFinite(Number(values.gridExport)) ||
+        !Number.isFinite(
+            Number(values.gridExport)
+        ) ||
         Number(values.gridExport) < 0
     ) {
-        errors.push("Enter a valid Grid Export reading.");
+        errors.push(
+            "Enter a valid Grid Export reading."
+        );
     }
 
-    // if (
-    //     values.solarInverter === "" ||
-    //     !Number.isFinite(Number(values.solarInverter)) ||
-    //     Number(values.solarInverter) < 0
-    // ) {
-    //     errors.push("Enter a valid Solar Inverter reading.");
-    // }
+    if (
+        values.solarInverter === "" ||
+        !Number.isFinite(
+            Number(values.solarInverter)
+        ) ||
+        Number(values.solarInverter) < 0
+    ) {
+        errors.push(
+            "Enter a valid Solar Generation value."
+        );
+    }
 
     if (previous) {
+        /*
+         * Grid Import is cumulative.
+         */
         if (
             Number(values.gridImport) <
             Number(previous.gridImport)
         ) {
             errors.push(
-                "Grid Import reading cannot be lower than the previous reading."
+                "Grid Import reading cannot be lower than the previous month-end reading."
             );
         }
 
+        /*
+         * Grid Export is cumulative.
+         */
         if (
             Number(values.gridExport) <
             Number(previous.gridExport)
         ) {
             errors.push(
-                "Grid Export reading cannot be lower than the previous reading."
+                "Grid Export reading cannot be lower than the previous month-end reading."
             );
         }
 
+        /*
+         * IMPORTANT:
+         *
+         * Solar Generation is a direct monthly/period value.
+         *
+         * Do NOT compare it with previous.solarInverter.
+         */
         if (
-            values.solarInverter === "" ||
-            !Number.isFinite(Number(values.solarInverter)) ||
-            Number(values.solarInverter) < 0
-        ) {
-            errors.push("Enter a valid Solar Inverter reading.");
-        }
-        if (
-            Number(values.solarInverter) <
-            Number(previous.solarInverter)
-        ) {
-            errors.push(
-                "Solar Inverter reading cannot be lower than the previous reading."
-            );
-        }
-        if (
-            values.readingDate <= previous.readingDate
+            values.readingDate <=
+            previous.readingDate
         ) {
             errors.push(
-                "Reading date must be after the previous reading date."
+                "Reading date must be after the previous month-end reading date."
             );
         }
     }
@@ -323,276 +439,370 @@ function validateReading(values, previous) {
 
 function renderForm() {
     const readingDate = getToday();
-    const previous = getPreviousReading(readingDate);
+
+    /*
+     * IMPORTANT:
+     *
+     * Do NOT use getLatestReading() here.
+     *
+     * The previous reading must be selected based on the
+     * current reading date.
+     */
+    const previous =
+        getPreviousReading(readingDate);
 
     const previousDate = previous
         ? formatDate(previous.readingDate)
         : "No previous reading";
 
     const previousGridImport = previous
-        ? formatNumber(previous.gridImport, 2)
+        ? formatNumber(
+            previous.gridImport,
+            2
+        )
         : "—";
 
     const previousGridExport = previous
-        ? formatNumber(previous.gridExport, 2)
+        ? formatNumber(
+            previous.gridExport,
+            2
+        )
         : "—";
 
     const previousSolarInverter = previous
-        ? formatNumber(previous.solarInverter, 2)
+        ? formatNumber(
+            previous.solarInverter,
+            2
+        )
         : "—";
 
     return `
-            <section class="reading-page">
+        <section class="reading-page">
 
-                <div class="page-header">
-                    <div>
-                        <div class="eyebrow">Energy tracking</div>
-                        <h1>Enter Reading</h1>
-                        <p>
-                            Record your latest electricity meter and
-                            solar inverter readings.
-                        </p>
+            <div class="page-header">
+                <div>
+                    <div class="eyebrow">
+                        Energy tracking
                     </div>
 
-                    <div class="page-month">
-                        ${escapeHtml(getCurrentMonth())}
-                    </div>
+                    <h1>Enter Reading</h1>
+
+                    <p>
+                        Record your latest electricity meter and
+                        solar inverter readings.
+                    </p>
                 </div>
 
-                <div class="reading-layout">
+                <div class="page-month">
+                    ${escapeHtml(
+        getCurrentMonth()
+    )}
+                </div>
+            </div>
 
-                    <div class="card reading-form-card">
+            <div class="reading-layout">
 
-                        <div class="card-header">
-                            <div>
-                                <h2>Current readings</h2>
-                                <p>
-                                    Enter the values exactly as shown
-                                    on your meters.
-                                </p>
-                            </div>
+                <div class="card reading-form-card">
+
+                    <div class="card-header">
+                        <div>
+                            <h2>Current readings</h2>
+
+                            <p>
+                                Enter the values exactly as shown
+                                on your meters.
+                            </p>
                         </div>
+                    </div>
 
-                        <form id="reading-form" novalidate>
+                    <form
+                        id="reading-form"
+                        novalidate
+                    >
 
-                            <div class="form-grid">
-
-                                <div class="form-field form-field-full">
-                                    <label for="reading-date">
-                                        Reading Date
-                                    </label>
-
-                                    <input
-                                        type="date"
-                                        id="reading-date"
-                                        name="readingDate"
-                                        value="${getToday()}"
-                                        required
-                                    />
-                                </div>
-
-                                <div class="reading-input-card">
-                                    <div class="reading-icon">
-                                        ↓
-                                    </div>
-
-                                    <div class="reading-input-content">
-
-                                        <label for="grid-import">
-                                            Grid Current Reading
-                                        </label>
-
-                                        <span class="field-help">
-                                            Grid Import
-                                        </span>
-
-                                        <div class="input-with-unit">
-                                            <input
-                                                type="number"
-                                                id="grid-import"
-                                                name="gridImport"
-                                                min="0"
-                                                step="0.01"
-                                                inputmode="decimal"
-                                                placeholder="0.00"
-                                                required
-                                            />
-
-                                            <span>kWh</span>
-                                        </div>
-
-                                    </div>
-                                </div>
-
-                                <div class="reading-input-card">
-                                    <div class="reading-icon">
-                                        ↑
-                                    </div>
-
-                                    <div class="reading-input-content">
-
-                                        <label for="grid-export">
-                                            Solar Current Reading
-                                        </label>
-
-                                        <span class="field-help">
-                                            Grid Export
-                                        </span>
-
-                                        <div class="input-with-unit">
-                                            <input
-                                                type="number"
-                                                id="grid-export"
-                                                name="gridExport"
-                                                min="0"
-                                                step="0.01"
-                                                inputmode="decimal"
-                                                placeholder="0.00"
-                                                required
-                                            />
-
-                                            <span>kWh</span>
-                                        </div>
-
-                                    </div>
-                                </div>
-
-                                <div class="reading-input-card form-field-full">
-                                    <div class="reading-icon">
-                                        ☀
-                                    </div>
-
-                                    <div class="reading-input-content">
-
-                                        <label for="solar-inverter">
-                                            Inverter Current Month Value
-                                        </label>
-
-                                        <span class="field-help">
-                                            Solar Inverter
-                                        </span>
-
-                                        <div class="input-with-unit">
-                                            <input
-                                                type="number"
-                                                id="solar-inverter"
-                                                name="solarInverter"
-                                                min="0"
-                                                step="0.01"
-                                                inputmode="decimal"
-                                                placeholder="0.00"
-                                                required
-                                            />
-
-                                            <span>kWh</span>
-                                        </div>
-
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div class="previous-reading">
-
-                                <div class="previous-reading-header">
-                                    <div>
-                                        <h3>Previous reading</h3>
-                                        <p id="previous-reading-date">
-                                            ${escapeHtml(previousDate)}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="previous-reading-grid">
-
-                                    <div>
-                                        <span>Grid Import</span>
-                                        <strong id="previous-grid-import">
-                                            ${previousGridImport} kWh
-                                        </strong>
-                                    </div>
-
-                                    <div>
-                                        <span>Grid Export</span>
-                                        <strong id="previous-grid-export">
-                                            ${previousGridExport} kWh
-                                        </strong>
-                                    </div>
-
-                                    <div>
-                                        <span>Solar Inverter</span>
-                                        <strong id="previous-solar-inverter">
-                                            ${previousSolarInverter} kWh
-                                        </strong>
-                                    </div>
-
-                                </div>
-
-                            </div>
+                        <div class="form-grid">
 
                             <div
-                                id="reading-preview"
-                                class="reading-preview"
-                                hidden
-                            ></div>
-
-                            <div
-                                id="reading-errors"
-                                class="form-errors"
-                                role="alert"
-                                hidden
-                            ></div>
-
-                            <label class="month-end-option">
+                                class="form-field form-field-full"
+                            >
+                                <label for="reading-date">
+                                    Reading Date
+                                </label>
 
                                 <input
-                                    type="checkbox"
-                                    id="is-month-end"
-                                    name="isMonthEnd"
+                                    type="date"
+                                    id="reading-date"
+                                    name="readingDate"
+                                    value="${getToday()}"
+                                    required
                                 />
+                            </div>
 
-                                <span class="checkbox-ui"></span>
+                            <div class="reading-input-card">
 
-                                <span class="month-end-text">
-                                    <strong>
-                                        Consider these as month-end readings
-                                    </strong>
+                                <div class="reading-icon">
+                                    ↓
+                                </div>
 
-                                    <small>
-                                        Save these values as the month-end
-                                        baseline for future calculations.
-                                    </small>
-                                </span>
-
-                            </label>
-
-                            <div class="form-actions">
-
-                                <button
-                                    type="button"
-                                    class="btn btn-secondary"
-                                    id="reading-cancel"
+                                <div
+                                    class="reading-input-content"
                                 >
-                                    Cancel
-                                </button>
 
-                                <button
-                                    type="submit"
-                                    class="btn btn-primary"
-                                >
-                                    Save Reading
-                                </button>
+                                    <label for="grid-import">
+                                        Grid Current Reading
+                                    </label>
+
+                                    <span class="field-help">
+                                        Grid Import
+                                    </span>
+
+                                    <div
+                                        class="input-with-unit"
+                                    >
+
+                                        <input
+                                            type="number"
+                                            id="grid-import"
+                                            name="gridImport"
+                                            min="0"
+                                            step="0.01"
+                                            inputmode="decimal"
+                                            placeholder="0.00"
+                                            required
+                                        />
+
+                                        <span>kWh</span>
+
+                                    </div>
+
+                                </div>
 
                             </div>
 
-                        </form>
+                            <div class="reading-input-card">
 
-                    </div>
+                                <div class="reading-icon">
+                                    ↑
+                                </div>
+
+                                <div
+                                    class="reading-input-content"
+                                >
+
+                                    <label for="grid-export">
+                                        Solar Current Reading
+                                    </label>
+
+                                    <span class="field-help">
+                                        Grid Export
+                                    </span>
+
+                                    <div
+                                        class="input-with-unit"
+                                    >
+
+                                        <input
+                                            type="number"
+                                            id="grid-export"
+                                            name="gridExport"
+                                            min="0"
+                                            step="0.01"
+                                            inputmode="decimal"
+                                            placeholder="0.00"
+                                            required
+                                        />
+
+                                        <span>kWh</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            <div
+                                class="reading-input-card form-field-full"
+                            >
+
+                                <div class="reading-icon">
+                                    ☀
+                                </div>
+
+                                <div
+                                    class="reading-input-content"
+                                >
+
+                                    <label for="solar-inverter">
+                                        Solar Generation Current Month
+                                    </label>
+
+                                    <span class="field-help">
+                                        Enter the solar energy generated for this month/period.
+                                    </span>
+
+                                    <div
+                                        class="input-with-unit"
+                                    >
+
+                                        <input
+                                            type="number"
+                                            id="solar-inverter"
+                                            name="solarInverter"
+                                            min="0"
+                                            step="0.01"
+                                            inputmode="decimal"
+                                            placeholder="0.00"
+                                            required
+                                        />
+
+                                        <span>kWh</span>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div class="previous-reading">
+
+                            <div
+                                class="previous-reading-header"
+                            >
+
+                                <div>
+
+                                    <h3>
+                                        Previous reading
+                                    </h3>
+
+                                    <p
+                                        id="previous-reading-date"
+                                    >
+                                        ${escapeHtml(
+        previousDate
+    )}
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+                            <div
+                                class="previous-reading-grid"
+                            >
+
+                                <div>
+                                    <span>
+                                        Grid Import
+                                    </span>
+
+                                    <strong
+                                        id="previous-grid-import"
+                                    >
+                                        ${previousGridImport}
+                                        kWh
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>
+                                        Grid Export
+                                    </span>
+
+                                    <strong
+                                        id="previous-grid-export"
+                                    >
+                                        ${previousGridExport}
+                                        kWh
+                                    </strong>
+                                </div>
+
+                                <div>
+                                    <span>Previous Solar Generation</span>
+
+                                    <strong
+                                        id="previous-solar-inverter"
+                                    >
+                                        ${previousSolarInverter}
+                                        kWh
+                                    </strong>
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <div
+                            id="reading-preview"
+                            class="reading-preview"
+                            hidden
+                        ></div>
+
+                        <div
+                            id="reading-errors"
+                            class="form-errors"
+                            role="alert"
+                            hidden
+                        ></div>
+
+                        <label class="month-end-option">
+
+                            <input
+                                type="checkbox"
+                                id="is-month-end"
+                                name="isMonthEnd"
+                            />
+
+                            <span
+                                class="checkbox-ui"
+                            ></span>
+
+                            <span
+                                class="month-end-text"
+                            >
+
+                                <strong>
+                                    Consider these as month-end readings
+                                </strong>
+
+                                <small>
+                                    Save these values as the month-end
+                                    baseline for future calculations.
+                                </small>
+
+                            </span>
+
+                        </label>
+
+                        <div class="form-actions">
+
+                            <button
+                                type="button"
+                                class="btn btn-secondary"
+                                id="reading-cancel"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="submit"
+                                class="btn btn-primary"
+                            >
+                                Save Reading
+                            </button>
+
+                        </div>
+
+                    </form>
 
                 </div>
 
-            </section>
-        `;
+            </div>
+
+        </section>
+    `;
 }
 
 /* ------------------------------------------------------------
@@ -600,11 +810,30 @@ function renderForm() {
    ------------------------------------------------------------ */
 
 function updatePreviousReading() {
-    const dateInput = document.getElementById("reading-date");
-    const previousDateElement = document.getElementById("previous-reading-date");
-    const previousGridImportElement = document.getElementById("previous-grid-import");
-    const previousGridExportElement = document.getElementById("previous-grid-export");
-    const previousSolarInverterElement = document.getElementById("previous-solar-inverter");
+    const dateInput =
+        document.getElementById(
+            "reading-date"
+        );
+
+    const previousDateElement =
+        document.getElementById(
+            "previous-reading-date"
+        );
+
+    const previousGridImportElement =
+        document.getElementById(
+            "previous-grid-import"
+        );
+
+    const previousGridExportElement =
+        document.getElementById(
+            "previous-grid-export"
+        );
+
+    const previousSolarInverterElement =
+        document.getElementById(
+            "previous-solar-inverter"
+        );
 
     if (
         !dateInput ||
@@ -616,23 +845,47 @@ function updatePreviousReading() {
         return null;
     }
 
-    const previous = getPreviousReading(dateInput.value);
+    /*
+     * IMPORTANT:
+     *
+     * Always calculate the previous reading using the
+     * selected reading date.
+     */
+    const previous =
+        getPreviousReading(
+            dateInput.value
+        );
 
-    previousDateElement.textContent = previous
-        ? formatDate(previous.readingDate)
-        : "No previous reading";
+    previousDateElement.textContent =
+        previous
+            ? formatDate(
+                previous.readingDate
+            )
+            : "No previous reading";
 
-    previousGridImportElement.textContent = previous
-        ? `${formatNumber(previous.gridImport, 2)} kWh`
-        : "— kWh";
+    previousGridImportElement.textContent =
+        previous
+            ? `${formatNumber(
+                previous.gridImport,
+                2
+            )} kWh`
+            : "— kWh";
 
-    previousGridExportElement.textContent = previous
-        ? `${formatNumber(previous.gridExport, 2)} kWh`
-        : "— kWh";
+    previousGridExportElement.textContent =
+        previous
+            ? `${formatNumber(
+                previous.gridExport,
+                2
+            )} kWh`
+            : "— kWh";
 
-    previousSolarInverterElement.textContent = previous
-        ? `${formatNumber(previous.solarInverter, 2)} kWh`
-        : "— kWh";
+    previousSolarInverterElement.textContent =
+        previous
+            ? `${formatNumber(
+                previous.solarInverter,
+                2
+            )} kWh`
+            : "— kWh";
 
     return previous;
 }
@@ -642,20 +895,29 @@ function updatePreviousReading() {
    ------------------------------------------------------------ */
 
 function updatePreview() {
-    const preview = document.getElementById("reading-preview");
+    const preview =
+        document.getElementById(
+            "reading-preview"
+        );
 
     if (!preview) {
         return;
     }
 
     const gridImport =
-        document.getElementById("grid-import");
+        document.getElementById(
+            "grid-import"
+        );
 
     const gridExport =
-        document.getElementById("grid-export");
+        document.getElementById(
+            "grid-export"
+        );
 
     const solarInverter =
-        document.getElementById("solar-inverter");
+        document.getElementById(
+            "solar-inverter"
+        );
 
     if (
         !gridImport ||
@@ -665,9 +927,14 @@ function updatePreview() {
         return;
     }
 
-    const gridImportValue = gridImport.value;
-    const gridExportValue = gridExport.value;
-    const solarInverterValue = solarInverter.value;
+    const gridImportValue =
+        gridImport.value;
+
+    const gridExportValue =
+        gridExport.value;
+
+    const solarInverterValue =
+        solarInverter.value;
 
     if (
         gridImportValue === "" ||
@@ -679,70 +946,114 @@ function updatePreview() {
     }
 
     const readingDate =
-        document.getElementById("reading-date")?.value;
+        document.getElementById(
+            "reading-date"
+        )?.value;
 
-    const previous = getPreviousReading(readingDate);
+    /*
+     * The preview MUST use the same previous-reading logic
+     * as the Previous Reading display and Save operation.
+     */
+    const previous =
+    getPreviousReading(readingDate);
 
+const solarBaseline =
+    getLatestMonthEndReading(readingDate);
 
-    const calculation = calculateReading(
+const calculation =
+    calculateReading(
         {
             gridImport: gridImportValue,
             gridExport: gridExportValue,
             solarInverter: solarInverterValue
         },
-        previous
+        previous,
+        solarBaseline
     );
 
     preview.innerHTML = `
-            <div class="preview-header">
-                <h3>Calculated period usage</h3>
-                <span>Based on previous reading</span>
+        <div class="preview-header">
+
+            <h3>
+                Calculated period usage
+            </h3>
+
+            <span>
+                Grid usage is based on the previous month-end reading
+            </span>
+
+        </div>
+
+        <div class="preview-grid">
+
+            <div class="preview-item">
+
+                <span>
+                    Solar Generation
+                </span>
+
+                <strong>
+                    ${formatNumber(
+        calculation
+            .solarGenerationUnits,
+        2
+    )} kWh
+                </strong>
+
             </div>
 
-            <div class="preview-grid">
+            <div class="preview-item">
 
-                <div class="preview-item">
-                    <span>Solar Generation</span>
-                    <strong>
-                        ${formatNumber(
-        calculation.solarGenerationUnits,
+                <span>
+                    Grid Import
+                </span>
+
+                <strong>
+                    ${formatNumber(
+        calculation
+            .gridImportUnits,
         2
     )} kWh
-                    </strong>
-                </div>
-
-                <div class="preview-item">
-                    <span>Grid Import</span>
-                    <strong>
-                        ${formatNumber(
-        calculation.gridImportUnits,
-        2
-    )} kWh
-                    </strong>
-                </div>
-
-                <div class="preview-item">
-                    <span>Grid Export</span>
-                    <strong>
-                        ${formatNumber(
-        calculation.gridExportUnits,
-        2
-    )} kWh
-                    </strong>
-                </div>
-
-                <div class="preview-item preview-highlight">
-                    <span>Home Consumption</span>
-                    <strong>
-                        ${formatNumber(
-        calculation.homeConsumption,
-        2
-    )} kWh
-                    </strong>
-                </div>
+                </strong>
 
             </div>
-        `;
+
+            <div class="preview-item">
+
+                <span>
+                    Grid Export
+                </span>
+
+                <strong>
+                    ${formatNumber(
+        calculation
+            .gridExportUnits,
+        2
+    )} kWh
+                </strong>
+
+            </div>
+
+            <div
+                class="preview-item preview-highlight"
+            >
+
+                <span>
+                    Home Consumption
+                </span>
+
+                <strong>
+                    ${formatNumber(
+        calculation
+            .homeConsumption,
+        2
+    )} kWh
+                </strong>
+
+            </div>
+
+        </div>
+    `;
 
     preview.hidden = false;
 }
@@ -754,48 +1065,109 @@ function updatePreview() {
 function handleSubmit(event) {
     event.preventDefault();
 
-    const form = event.currentTarget;
+    const form =
+        event.currentTarget;
+
+    const readingDateElement =
+        document.getElementById(
+            "reading-date"
+        );
+
+    const gridImportElement =
+        document.getElementById(
+            "grid-import"
+        );
+
+    const gridExportElement =
+        document.getElementById(
+            "grid-export"
+        );
+
+    const solarInverterElement =
+        document.getElementById(
+            "solar-inverter"
+        );
+
+    const monthEndElement =
+        document.getElementById(
+            "is-month-end"
+        );
+
+    const errorContainer =
+        document.getElementById(
+            "reading-errors"
+        );
+
+    if (
+        !readingDateElement ||
+        !gridImportElement ||
+        !gridExportElement ||
+        !solarInverterElement ||
+        !monthEndElement ||
+        !errorContainer
+    ) {
+        return;
+    }
 
     const values = {
         readingDate:
-            document.getElementById("reading-date").value,
+            readingDateElement.value,
 
         gridImport:
-            document.getElementById("grid-import").value,
+            gridImportElement.value,
 
         gridExport:
-            document.getElementById("grid-export").value,
+            gridExportElement.value,
 
         solarInverter:
-            document.getElementById("solar-inverter").value,
+            solarInverterElement.value,
 
         isMonthEnd:
-            document.getElementById("is-month-end").checked
+            monthEndElement.checked
     };
 
-    const previous = getPreviousReading(
+    /*
+     * IMPORTANT:
+     *
+     * Use the selected reading date.
+     *
+     * Never use getLatestReading() here.
+     */
+    const previous =
+    getPreviousReading(
         values.readingDate
     );
 
-    const errors = validateReading(
-        values,
-        previous
+const solarBaseline =
+    getLatestMonthEndReading(
+        values.readingDate
     );
 
-    const errorContainer =
-        document.getElementById("reading-errors");
+const errors =
+    validateReading(
+        values,
+        previous,
+        solarBaseline
+    );
 
     if (errors.length) {
         errorContainer.innerHTML = `
-                <strong>Please correct the following:</strong>
-                <ul>
-                    ${errors
+            <strong>
+                Please correct the following:
+            </strong>
+
+            <ul>
+                ${errors
                 .map(function (error) {
-                    return `<li>${escapeHtml(error)}</li>`;
+                    return `
+                            <li>
+                                ${escapeHtml(error)}
+                            </li>
+                        `;
                 })
                 .join("")}
-                </ul>
-            `;
+            </ul>
+        `;
 
         errorContainer.hidden = false;
 
@@ -804,10 +1176,16 @@ function handleSubmit(event) {
 
     errorContainer.hidden = true;
 
-    const calculation = calculateReading(
-        values,
-        previous
-    );
+    /*
+     * Calculate using exactly the same previous reading
+     * that was selected for validation and display.
+     */
+    const calculation =
+        calculateReading(
+            values,
+            previous,
+            solarBaseline
+        );
 
     const reading = {
         id:
@@ -818,45 +1196,58 @@ function handleSubmit(event) {
                 .toString(36)
                 .substring(2, 8),
 
-        readingDate: values.readingDate,
+        readingDate:
+            values.readingDate,
 
-        gridImport: Number(values.gridImport),
+        gridImport:
+            Number(values.gridImport),
 
-        gridExport: Number(values.gridExport),
+        gridExport:
+            Number(values.gridExport),
 
-        solarInverter: Number(values.solarInverter),
+        solarInverter:
+            Number(values.solarInverter),
 
-        isMonthEnd: Boolean(values.isMonthEnd),
+        isMonthEnd:
+            Boolean(values.isMonthEnd),
 
         calculation: {
             solarGeneration:
-                calculation.solarGenerationUnits,
+                calculation
+                    .solarGenerationUnits,
 
             gridImportUnits:
-                calculation.gridImportUnits,
+                calculation
+                    .gridImportUnits,
 
             gridExportUnits:
-                calculation.gridExportUnits,
+                calculation
+                    .gridExportUnits,
 
             homeConsumption:
-                calculation.homeConsumption
+                calculation
+                    .homeConsumption
         },
 
         createdAt:
             new Date().toISOString()
     };
 
-    const readings = getReadings();
+    const readings =
+        getReadings();
 
     readings.push(reading);
 
     if (!saveReadings(readings)) {
         errorContainer.innerHTML = `
-                <strong>Unable to save reading.</strong>
-                <p>
-                    Your browser storage may be unavailable.
-                </p>
-            `;
+            <strong>
+                Unable to save reading.
+            </strong>
+
+            <p>
+                Your browser storage may be unavailable.
+            </p>
+        `;
 
         errorContainer.hidden = false;
 
@@ -868,22 +1259,28 @@ function handleSubmit(event) {
      * reading has been saved.
      */
     window.dispatchEvent(
-        new CustomEvent("solar:reading-saved", {
-            detail: reading
-        })
+        new CustomEvent(
+            "solar:reading-saved",
+            {
+                detail: reading
+            }
+        )
     );
 
     showSuccess(reading);
 
     form.reset();
 
-    const dateInput =
-        document.getElementById("reading-date");
-
-    if (dateInput) {
-        dateInput.value = getToday();
+    if (readingDateElement) {
+        readingDateElement.value =
+            getToday();
     }
 
+    /*
+     * Refresh both the previous-reading display and
+     * calculation preview after saving.
+     */
+    updatePreviousReading();
     updatePreview();
 }
 
@@ -893,76 +1290,65 @@ function handleSubmit(event) {
 
 function showSuccess(reading) {
     const appContent =
-        document.getElementById("app-content");
+        document.getElementById(
+            "app-content"
+        );
 
     if (!appContent) {
         return;
     }
 
-    const message = document.createElement("div");
+    const message =
+        document.createElement(
+            "div"
+        );
 
-    message.className = "toast toast-success";
+    message.className =
+        "toast toast-success";
 
     message.innerHTML = `
-            <strong>Reading saved successfully.</strong>
-            <span>
-                ${escapeHtml(formatDate(reading.readingDate))}
-                has been added to your readings.
-            </span>
-        `;
+        <strong>
+            Reading saved successfully.
+        </strong>
 
-    document.body.appendChild(message);
+        <span>
+            ${escapeHtml(
+        formatDate(
+            reading.readingDate
+        )
+    )}
+            has been added to your readings.
+        </span>
+    `;
 
-    window.setTimeout(function () {
-        message.classList.add("is-visible");
-    }, 10);
+    document.body.appendChild(
+        message
+    );
 
-    window.setTimeout(function () {
-        message.classList.remove("is-visible");
+    window.setTimeout(
+        function () {
+            message.classList.add(
+                "is-visible"
+            );
+        },
+        10
+    );
 
-        window.setTimeout(function () {
-            message.remove();
-        }, 300);
-    }, 3500);
-}
+    window.setTimeout(
+        function () {
+            message.classList.remove(
+                "is-visible"
+            );
 
-function updatePreviousReading() {
-    const dateInput =
-        document.getElementById("reading-date");
-
-    if (!dateInput) {
-        return;
-    }
-
-    const previous =
-        getPreviousReading(dateInput.value);
-
-    const previousDate =
-        document.querySelector(
-            ".previous-reading-header p"
-        );
-
-    const previousValues =
-        document.querySelectorAll(
-            ".previous-reading-grid strong"
-        );
-
-    if (previousDate) {
-        previousDate.textContent = previous
-            ? formatDate(previous.readingDate)
-            : "No previous reading";
-    }
-
-    if (previousValues.length >= 3) {
-        previousValues[0].textContent =
-            `${previous ? formatNumber(previous.gridImport, 2) : "—"} kWh`;
-
-        previousValues[1].textContent =
-            `${previous ? formatNumber(previous.gridExport, 2) : "—"} kWh`;
-
-        previousValues[2].textContent =
-            `${previous ? formatNumber(previous.solarInverter, 2) : "—"} kWh`;
-    }
+            window.setTimeout(
+                function () {
+                    message.remove();
+                },
+                300
+            );
+        },
+        3500
+    );
 }
 
 /* ------------------------------------------------------------
@@ -971,7 +1357,9 @@ function updatePreviousReading() {
 
 function bindEvents() {
     const form =
-        document.getElementById("reading-form");
+        document.getElementById(
+            "reading-form"
+        );
 
     if (!form) {
         return;
@@ -983,27 +1371,30 @@ function bindEvents() {
     );
 
     const dateInput =
-        document.getElementById("reading-date");
+        document.getElementById(
+            "reading-date"
+        );
 
-    // if (dateInput) {
-    //     dateInput.addEventListener(
-    //         "change",
-    //         function () {
-    //             updatePreviousReading();
-    //             updatePreview();
-    //         }
-    //     );
-    // }
     if (dateInput) {
-        dateInput.addEventListener("input", function () {
-            updatePreviousReading();
-            updatePreview();
-        });
+        /*
+         * Update previous reading immediately when
+         * the selected date changes.
+         */
+        dateInput.addEventListener(
+            "input",
+            function () {
+                updatePreviousReading();
+                updatePreview();
+            }
+        );
 
-        dateInput.addEventListener("change", function () {
-            updatePreviousReading();
-            updatePreview();
-        });
+        dateInput.addEventListener(
+            "change",
+            function () {
+                updatePreviousReading();
+                updatePreview();
+            }
+        );
     }
 
     [
@@ -1011,7 +1402,8 @@ function bindEvents() {
         "grid-export",
         "solar-inverter"
     ].forEach(function (id) {
-        const input = document.getElementById(id);
+        const input =
+            document.getElementById(id);
 
         if (input) {
             input.addEventListener(
@@ -1022,7 +1414,9 @@ function bindEvents() {
     });
 
     const cancelButton =
-        document.getElementById("reading-cancel");
+        document.getElementById(
+            "reading-cancel"
+        );
 
     if (cancelButton) {
         cancelButton.addEventListener(
@@ -1031,12 +1425,16 @@ function bindEvents() {
                 form.reset();
 
                 const dateInput =
-                    document.getElementById("reading-date");
+                    document.getElementById(
+                        "reading-date"
+                    );
 
                 if (dateInput) {
-                    dateInput.value = getToday();
+                    dateInput.value =
+                        getToday();
                 }
 
+                updatePreviousReading();
                 updatePreview();
             }
         );
@@ -1058,9 +1456,12 @@ function render() {
 window.SolarReading = {
     render: render,
     getReadings: getReadings,
-    getLatestReading: getLatestReading,
-    getPreviousReading: getPreviousReading,
-    calculateReading: calculateReading
+    getLatestReading:
+        getLatestReading,
+    getPreviousReading:
+        getPreviousReading,
+    calculateReading:
+        calculateReading
 };
 
 /*
@@ -1074,13 +1475,16 @@ window.SolarReading = {
  */
 
 function init() {
-
     bindEvents();
+    updatePreviousReading();
     updatePreview();
-};
-
+}
 
 export {
-    calculateReading, getLatestReading, getReadings, init, render
+    calculateReading,
+    getLatestReading,
+    getPreviousReading,
+    getReadings,
+    init,
+    render
 };
-
