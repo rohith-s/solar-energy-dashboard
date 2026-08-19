@@ -7,18 +7,17 @@ import {
   render as renderReading
 } from "../modules/reading/reading.js";
 
+import {
+  bindEvents as bindHistoryEvents,
+  render as renderHistory
+} from "../modules/history/history.js";
 
 const ROUTES = {
   dashboard: renderDashboard,
 
   reading: renderReading,
 
-  history: () =>
-    renderPlaceholder(
-      "History",
-      "◷",
-      "Reading history will be implemented after the data model is finalized."
-    ),
+  history: renderHistory,
 
   analytics: () =>
     renderPlaceholder(
@@ -151,6 +150,11 @@ function render() {
 
     if (route === "reading") {
       initReading();
+    }
+    if (route === "history") {
+      bindHistoryEvents(function () {
+        window.location.hash = "#/reading";
+      });
     }
 
     updateActiveNavigation(route);

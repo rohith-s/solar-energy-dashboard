@@ -1,0 +1,132 @@
+.history-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.history-table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+    padding: 12px 14px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.history-table th {
+    font-weight: 600;
+}
+
+.history-table td {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.history-table .number-cell {
+    text-align: right;
+}
+
+.month-end-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: default;
+}
+
+.month-end-status input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: default;
+}
+
+.month-end-status span {
+    white-space: nowrap;
+}
+
+.history-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.history-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.history-filter-group label {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.history-filter-group input[type="date"],
+.history-filter-group select {
+    min-height: 34px;
+}
+
+.history-filter-checkbox {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+}
+
+.history-filter-checkbox input {
+    width: 16px;
+    height: 16px;
+}
+
+.history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+
+.history-pagination-info {
+    font-size: 13px;
+}
+
+.history-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.history-pagination-controls label {
+    font-size: 12px;
+}
+
+.history-pagination-controls select {
+    min-height: 34px;
+}
+
+.history-page-number {
+    min-width: 90px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.history-pagination button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.history-no-results {
+    padding: 32px 16px !important;
+    text-align: center !important;
+    font-weight: 600;
+}
