@@ -71,57 +71,67 @@ function saveReadings(readings) {
  *
  * Previous reading for 01-Sep = 31-Aug
  */
-function getPreviousReading(readingDate, excludeId) {
+function getPreviousReading(
+    readingDate,
+    excludeId
+) {
     const readings = getReadings();
 
-    if (!readings.length || !readingDate) {
+    if (
+        !readings.length ||
+        !readingDate
+    ) {
         return null;
     }
 
     return readings
         .filter(function (reading) {
-            if (!reading || !reading.readingDate) {
+            if (
+                !reading ||
+                !reading.readingDate
+            ) {
                 return false;
             }
 
-            if (excludeId && reading.id === excludeId) {
+            if (
+                excludeId &&
+                reading.id === excludeId
+            ) {
                 return false;
             }
 
-            /*
-             * Only month-end readings can be used
-             * as the previous baseline.
-             */
+            // Only month-end readings can be used
+            // as the previous baseline.
             if (!reading.isMonthEnd) {
                 return false;
             }
 
-            /*
-             * The previous reading must be strictly
-             * before the selected reading date.
-             */
-            return reading.readingDate < readingDate;
+            // Previous must be strictly before
+            // the selected reading date.
+            return (
+                reading.readingDate <
+                readingDate
+            );
         })
         .sort(function (a, b) {
-            /*
-             * Latest month-end date first.
-             */
-            if (a.readingDate !== b.readingDate) {
+            if (
+                a.readingDate !==
+                b.readingDate
+            ) {
                 return b.readingDate.localeCompare(
                     a.readingDate
                 );
             }
 
-            /*
-             * Deterministic ordering for legacy
-             * duplicate-date records.
-             */
-            return String(b.createdAt || "").localeCompare(
+            // Deterministic ordering for duplicate
+            // month-end records.
+            return String(
+                b.createdAt || ""
+            ).localeCompare(
                 String(a.createdAt || "")
             );
         })[0] || null;
 }
-
 /**
  * Return the latest saved record regardless of the date supplied.
  *
@@ -139,46 +149,6 @@ function getLatestReading() {
 
     return readings
         .slice()
-        .sort(function (a, b) {
-            if (a.readingDate !== b.readingDate) {
-                return b.readingDate.localeCompare(
-                    a.readingDate
-                );
-            }
-
-            return String(
-                b.createdAt || ""
-            ).localeCompare(
-                String(a.createdAt || "")
-            );
-        })[0] || null;
-}
-
-function getLatestMonthEndReading(readingDate, excludeId) {
-    const readings = getReadings();
-
-    if (!readings.length || !readingDate) {
-        return null;
-    }
-
-    return readings
-        .filter(function (reading) {
-            if (!reading || !reading.readingDate) {
-                return false;
-            }
-
-            if (
-                excludeId &&
-                reading.id === excludeId
-            ) {
-                return false;
-            }
-
-            return (
-                reading.isMonthEnd === true &&
-                reading.readingDate < readingDate
-            );
-        })
         .sort(function (a, b) {
             if (a.readingDate !== b.readingDate) {
                 return b.readingDate.localeCompare(
@@ -266,8 +236,7 @@ function escapeHtml(value) {
    ------------------------------------------------------------ */
 function calculateReading(
     current,
-    previous,
-    solarBaseline
+    previous
 ) {
     const currentGridImport =
         Number(current.gridImport);
@@ -341,8 +310,7 @@ function calculateReading(
 
 function validateReading(
     values,
-    previous,
-    solarBaseline
+    previous
 ) {
     const errors = [];
 
@@ -957,19 +925,15 @@ function updatePreview() {
     const previous =
     getPreviousReading(readingDate);
 
-const solarBaseline =
-    getLatestMonthEndReading(readingDate);
-
-const calculation =
-    calculateReading(
-        {
-            gridImport: gridImportValue,
-            gridExport: gridExportValue,
-            solarInverter: solarInverterValue
-        },
-        previous,
-        solarBaseline
-    );
+    const calculation =
+        calculateReading(
+            {
+                gridImport: gridImportValue,
+                gridExport: gridExportValue,
+                solarInverter: solarInverterValue
+            },
+            previous
+        );
 
     preview.innerHTML = `
         <div class="preview-header">
@@ -1138,17 +1102,11 @@ function handleSubmit(event) {
         values.readingDate
     );
 
-const solarBaseline =
-    getLatestMonthEndReading(
-        values.readingDate
-    );
-
-const errors =
-    validateReading(
-        values,
-        previous,
-        solarBaseline
-    );
+    const errors =
+        validateReading(
+            values,
+            previous
+        );
 
     if (errors.length) {
         errorContainer.innerHTML = `
@@ -1183,8 +1141,7 @@ const errors =
     const calculation =
         calculateReading(
             values,
-            previous,
-            solarBaseline
+            previous
         );
 
     const reading = {
