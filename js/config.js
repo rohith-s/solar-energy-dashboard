@@ -19,7 +19,7 @@ export const CONFIG = Object.freeze({
 
     API: {
 
-        GOOGLE_SCRIPT_URL: "",
+        GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbw9czZazEola8dXP_yl9LpWBpYKQVyMvnMTNaex3zUiQgAf7kRCe-fImLgMMcjaxkMtyg/exec",
 
         REQUEST_TIMEOUT: 30000
 
