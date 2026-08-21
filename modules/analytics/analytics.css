@@ -556,3 +556,98 @@
         font-size: 21px
     }
 }
+
+/* Commit 8 refinement: selected-range net position summary */
+.net-position-summary {
+    margin-top: 14px;
+    overflow: hidden
+}
+
+.net-position-values {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    padding: 0 18px 18px
+}
+
+.net-position-value {
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    min-width: 0
+}
+
+.net-position-value span,
+.net-position-value small {
+    display: block
+}
+
+.net-position-value span {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--color-text-muted)
+}
+
+.net-position-value strong {
+    display: block;
+    margin: 7px 0 4px;
+    font-size: clamp(24px, 4vw, 34px);
+    line-height: 1.05;
+    letter-spacing: -.03em
+}
+
+.net-position-value small {
+    font-size: 10px;
+    color: var(--color-text-soft)
+}
+
+.net-position-value.positive {
+    border-color: rgba(16, 185, 129, .38)
+}
+
+.net-position-value.positive strong {
+    color: var(--color-success)
+}
+
+.net-position-value.negative {
+    border-color: rgba(239, 68, 68, .38)
+}
+
+.net-position-value.negative strong {
+    color: var(--color-danger)
+}
+
+.latest-period-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: var(--color-surface-2);
+    color: var(--color-primary);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .02em
+}
+
+@media(max-width:767px) {
+    .net-position-values {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding-left: 14px;
+        padding-right: 14px
+    }
+
+    .latest-period-badge {
+        margin-left: 0;
+        margin-top: 6px
+    }
+
+    .period-note {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 6px
+    }
+}
