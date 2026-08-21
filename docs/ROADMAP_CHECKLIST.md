@@ -11,7 +11,7 @@
 - [ ] Commit 6 — Dashboard Real Data
 - [ ] Commit 7 — Google Sheets
 - [ ] Commit 8 — Analytics
-- [ ] Commit 9 — Settings / Tariff Configuration
+- [x] Commit 9 — Settings / Tariff Configuration
 - [ ] Commit 10 — PWA / Offline / Installability
 
 ## Functional contracts to preserve
@@ -28,5 +28,5 @@
 - [ ] Dashboard reads real data.
 - [ ] Google Sheets synchronization.
 - [ ] Analytics.
-- [ ] Tariff/settings.
+- [x] Tariff/settings.
 - [ ] PWA/offline/installability.

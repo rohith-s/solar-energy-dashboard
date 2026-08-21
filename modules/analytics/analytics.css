@@ -651,3 +651,63 @@
         gap: 4px 6px
     }
 }
+
+.settings-rate {
+    min-width: 145px;
+    justify-content: center;
+}
+
+.settings-rate strong {
+    font-size: 14px;
+    color: var(--color-text);
+}
+
+.analytics-settings-link {
+    align-self: flex-end;
+    margin-top: 4px;
+    color: var(--color-primary);
+    font-size: 10px;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.analytics-settings-link:hover {
+    text-decoration: underline;
+}
+
+/* Commit 9: tariff / revenue value in monthly summary */
+.analytics-table .tariff-revenue {
+    min-width: 132px;
+}
+
+.analytics-table .tariff-revenue strong,
+.analytics-table .tariff-revenue small {
+    display: block;
+}
+
+.analytics-table .tariff-revenue strong {
+    font-size: 13px;
+}
+
+.analytics-table .tariff-revenue small {
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.analytics-table .tariff-revenue.positive strong,
+.analytics-table .tariff-revenue.positive small {
+    color: var(--color-success);
+}
+
+.analytics-table .tariff-revenue.negative strong,
+.analytics-table .tariff-revenue.negative small {
+    color: var(--color-danger);
+}
+
+.analytics-table .tariff-revenue.balanced strong,
+.analytics-table .tariff-revenue.balanced small {
+    color: var(--color-text-soft);
+}

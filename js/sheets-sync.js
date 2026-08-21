@@ -15,6 +15,7 @@ function isRefreshableRoute() {
     return (
         hash.indexOf("#/dashboard") === 0 ||
         hash.indexOf("#/history") === 0 ||
+        hash.indexOf("#/analytics") === 0 ||
         hash === "" ||
         hash === "#/"
     );
@@ -72,6 +73,8 @@ function runSync(refresh) {
     if (!isConfigured()) {
         return;
     }
+
+    window.dispatchEvent(new CustomEvent("solar:sync-start"));
 
     syncReadings(function (result) {
         notifySync(result);

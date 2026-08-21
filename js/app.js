@@ -14,6 +14,7 @@ import {
 } from "../modules/history/history.js";
 
 import { init as initAnalytics, render as renderAnalytics } from "../modules/analytics/analytics.js";
+import { init as initSettings, render as renderSettings } from "../modules/settings/settings.js";
 
 const ROUTES = {
   dashboard: renderDashboard,
@@ -24,12 +25,7 @@ const ROUTES = {
 
   analytics: renderAnalytics,
 
-  settings: () =>
-    renderPlaceholder(
-      "Settings",
-      "⚙",
-      "Application and tariff configuration will be implemented in the Settings module."
-    )
+  settings: renderSettings
 };
 
 
@@ -88,6 +84,23 @@ function updateHeaderMonth() {
     month: "short",
     year: "numeric"
   }).format(now);
+}
+
+
+function updateSyncStatus(status, message) {
+  const indicator = document.querySelector(".status-indicator");
+  const dot = document.querySelector(".status-dot");
+
+  if (!indicator || !dot) {
+    return;
+  }
+
+  indicator.classList.remove("status-local", "status-syncing", "status-synced", "status-error");
+  dot.classList.remove("status-local", "status-syncing", "status-synced", "status-error");
+
+  indicator.classList.add("status-" + status);
+  dot.classList.add("status-" + status);
+  indicator.lastChild.textContent = " " + (message || "Local");
 }
 
 
@@ -158,6 +171,7 @@ function render() {
       });
     }
     if (route === "analytics") { initAnalytics(); }
+    if (route === "settings") { initSettings(); }
 
     updateActiveNavigation(route);
     updateHeaderMonth();
@@ -236,6 +250,28 @@ document.querySelectorAll(".nav-item").forEach(item => {
 
 
 window.addEventListener(
+  "solar:sync-status",
+  event => {
+    const detail = event.detail || {};
+    updateSyncStatus(detail.ok ? "synced" : "error", detail.ok ? "Synced" : "Sync failed");
+  }
+);
+
+window.addEventListener(
+  "solar:sync-start",
+  () => updateSyncStatus("syncing", "Syncing…")
+);
+
+window.addEventListener(
+  "solar:tariff-settings-changed",
+  () => {
+    if (currentRoute() === "analytics") {
+      render();
+    }
+  }
+);
+
+window.addEventListener(
   "hashchange",
   render
 );
@@ -250,6 +286,8 @@ window.addEventListener(
   }
 );
 
+
+updateSyncStatus("local", "Local");
 
 if (!window.location.hash) {
   window.location.hash = "#/dashboard";

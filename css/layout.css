@@ -105,3 +105,11 @@ a { color: inherit; }
   z-index: 190;
   background: rgba(0,0,0,.55);
 }
+
+.status-dot.status-local { background: var(--color-success); }
+.status-dot.status-syncing { background: var(--color-primary); animation: status-pulse 1s infinite; }
+.status-dot.status-synced { background: var(--color-success); }
+.status-dot.status-error { background: var(--color-danger); }
+.status-indicator.status-error { color: var(--color-danger); }
+.status-indicator.status-syncing { color: var(--color-primary); }
+@keyframes status-pulse { 50% { opacity: .35; } }

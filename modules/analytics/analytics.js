@@ -1,9 +1,8 @@
 import { getReadings, getPreviousReading, calculateReading } from "../reading/reading.js";
+import { getTariffConfig, getTariffConfigForPeriod, calculateNetSettlement } from "../../js/tariff-engine.js";
 
 var RANGE_KEY = "solarEnergyDashboard.analytics.range";
-var RATE_KEY = "solarEnergyDashboard.analytics.exportRate";
 var range = "6";
-var exportRate = 2.09;
 var bound = false;
 
 function esc(v) {
@@ -154,89 +153,21 @@ function load() {
             range = r;
         }
 
-        var storedRate = localStorage.getItem(RATE_KEY);
-        var v = storedRate === null ? NaN : Number(storedRate);
-
-        if (isFinite(v) && v >= 0) {
-            exportRate = v;
-        }
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function save() {
     try {
         localStorage.setItem(RANGE_KEY, range);
-        localStorage.setItem(RATE_KEY, String(exportRate));
-    } catch (e) {}
-}
-
-function tariff(units) {
-    var rem = Math.max(0, Number(units) || 0);
-    var charge = 0;
-    var u;
-
-    u = Math.min(rem, 30);
-    charge += u * 1.90;
-    rem -= u;
-
-    if (rem > 0) {
-        u = Math.min(rem, 45);
-        charge += u * 3;
-        rem -= u;
-    }
-
-    if (rem > 0) {
-        u = Math.min(rem, 50);
-        charge += u * 4.5;
-        rem -= u;
-    }
-
-    if (rem > 0) {
-        u = Math.min(rem, 100);
-        charge += u * 6;
-        rem -= u;
-    }
-
-    if (rem > 0) {
-        u = Math.min(rem, 175);
-        charge += u * 8.75;
-        rem -= u;
-    }
-
-    if (rem > 0) {
-        charge += rem * 9.75;
-    }
-
-    return {
-        energy: charge,
-        fixed: 10,
-        total: charge + 10
-    };
+    } catch (e) { }
 }
 
 function settlement(r) {
-    var net = r.exp - r.imp;
-
-    if (net > 0) {
-        return {
-            type: "export",
-            net: net,
-            value: net * exportRate
-        };
-    }
-
-    if (net < 0) {
-        return {
-            type: "import",
-            net: net,
-            tariff: tariff(-net)
-        };
-    }
-
-    return {
-        type: "balanced",
-        net: 0
-    };
+    return calculateNetSettlement(
+        r.exp,
+        r.imp,
+        getTariffConfigForPeriod(r.period)
+    );
 }
 
 function metric(title, value, note, cls) {
@@ -244,7 +175,7 @@ function metric(title, value, note, cls) {
         '<span>' + esc(title) + '</span>' +
         '<strong>' + esc(value) + '</strong>' +
         '<small>' + esc(note) + '</small>' +
-    '</article>';
+        '</article>';
 }
 
 function lineChart(rs) {
@@ -362,7 +293,7 @@ function flow(r) {
             num(x[1], 2) + ' kWh</strong></div>' +
             '<i><b class="' + x[2] + '" style="width:' +
             Math.max(4, x[1] / max * 100) + '%"></b></i>' +
-        '</div>';
+            '</div>';
     }).join("");
 }
 
@@ -374,9 +305,9 @@ function settlementCard(r) {
     if (s.type === "export") {
         return '<section class="card settlement export">' +
             '<div class="settlement-top"><div>' +
-                '<p class="eyebrow">APSPDCL net energy position · ' +
-                esc(periodContext) + '</p>' +
-                '<h2>Net Export</h2>' +
+            '<p class="eyebrow">APSPDCL net energy position · ' +
+            esc(periodContext) + '</p>' +
+            '<h2>Net Export</h2>' +
             '</div><b>NET EXPORT</b></div>' +
             '<strong class="settlement-number">+' +
             num(s.net, 2) + ' kWh</strong>' +
@@ -385,18 +316,18 @@ function settlementCard(r) {
             num(r.imp, 2) + ' = ' + num(s.net, 2) +
             ' kWh</div>' +
             '<div class="settlement-value"><span>Estimated settlement</span>' +
-            '<strong>' + esc(money(s.value)) + '</strong>' +
-            '<small>@ ₹' + num(exportRate, 2) + ' / kWh</small></div>' +
+            '<strong>' + esc(money(s.settlementValue)) + '</strong>' +
+            '<small>' + num(s.calculationUnits, 0) + ' tariff units × ₹' + num(s.settlementRate, 2) + ' / kWh · FY ' + esc(s.tariffYear) + '</small></div>' +
             '<p class="disclaimer">Indicative settlement estimate; actual settlement depends on the applicable solar/net-metering agreement.</p>' +
-        '</section>';
+            '</section>';
     }
 
     if (s.type === "import") {
         return '<section class="card settlement import">' +
             '<div class="settlement-top"><div>' +
-                '<p class="eyebrow">APSPDCL net energy position · ' +
-                esc(periodContext) + '</p>' +
-                '<h2>Net Import</h2>' +
+            '<p class="eyebrow">APSPDCL net energy position · ' +
+            esc(periodContext) + '</p>' +
+            '<h2>Net Import</h2>' +
             '</div><b>NET IMPORT</b></div>' +
             '<strong class="settlement-number">' +
             num(s.net, 2) + ' kWh</strong>' +
@@ -405,14 +336,16 @@ function settlementCard(r) {
             num(r.imp, 2) + ' = ' + num(s.net, 2) +
             ' kWh</div>' +
             '<div class="settlement-value"><span>Estimated APSPDCL charge</span>' +
-            '<strong>' + esc(money(s.tariff.total)) + '</strong>' +
-            '<small>Domestic telescopic estimate • FY 2026-27</small></div>' +
+            '<strong>' + esc(money(s.bill.total)) + '</strong>' +
+            '<small>' + num(s.calculationUnits, 0) + ' tariff units · LT-I Domestic telescopic estimate · FY ' + esc(s.bill.tariffYear) + '</small></div>' +
             '<div class="tariff-breakdown"><span>Energy charge</span>' +
-            '<strong>' + esc(money(s.tariff.energy)) + '</strong>' +
+            '<strong>' + esc(money(s.bill.energyCharge)) + '</strong>' +
             '<span>Fixed charge</span><strong>' +
-            esc(money(s.tariff.fixed)) + '</strong></div>' +
+            esc(money(s.bill.fixedCharge)) + '</strong>' +
+            '<span>Customer charge</span><strong>' +
+            esc(money(s.bill.customerCharge)) + '</strong></div>' +
             '<p class="disclaimer">Indicative estimate only; excludes consumer-specific adjustments, arrears, subsidies, taxes and other bill charges.</p>' +
-        '</section>';
+            '</section>';
     }
 
     return '<section class="card settlement balanced">' +
@@ -421,7 +354,7 @@ function settlementCard(r) {
         '<h2>Balanced</h2>' +
         '<strong class="settlement-number">0.00 kWh</strong>' +
         '<p class="disclaimer">Grid import and export are equal for this period.</p>' +
-    '</section>';
+        '</section>';
 }
 
 function insights(r) {
@@ -441,7 +374,7 @@ function insights(r) {
         '<strong>' + num(gridPct, 2) + '%</strong><small>of home consumption</small></article>' +
         '<article class="card insight"><span>Solar export ratio</span>' +
         '<strong>' + num(exportPct, 2) + '%</strong><small>of solar generation exported</small></article>' +
-    '</div>';
+        '</div>';
 }
 
 function netPositionSummary(rs) {
@@ -460,33 +393,51 @@ function netPositionSummary(rs) {
 
     return '<section class="card net-position-summary">' +
         '<div class="section-heading"><div>' +
-            '<h2>Net Position Summary</h2>' +
-            '<p>Positive and negative monthly net positions are shown separately for the selected range.</p>' +
+        '<h2>Net Position Summary</h2>' +
+        '<p>Positive and negative monthly net positions are shown separately for the selected range.</p>' +
         '</div></div>' +
         '<div class="net-position-values">' +
-            '<div class="net-position-value positive">' +
-                '<span>Positive Net</span>' +
-                '<strong>+' + num(positive, 2) + ' kWh</strong>' +
-                '<small>Sum of positive monthly net positions</small>' +
-            '</div>' +
-            '<div class="net-position-value negative">' +
-                '<span>Negative Net</span>' +
-                '<strong>' + num(negative, 2) + ' kWh</strong>' +
-                '<small>Sum of negative monthly net positions</small>' +
-            '</div>' +
+        '<div class="net-position-value positive">' +
+        '<span>Positive Net</span>' +
+        '<strong>+' + num(positive, 2) + ' kWh</strong>' +
+        '<small>Sum of positive monthly net positions</small>' +
         '</div>' +
-    '</section>';
+        '<div class="net-position-value negative">' +
+        '<span>Negative Net</span>' +
+        '<strong>' + num(negative, 2) + ' kWh</strong>' +
+        '<small>Sum of negative monthly net positions</small>' +
+        '</div>' +
+        '</div>' +
+        '</section>';
 }
 
 function table(rs) {
     return '<section class="card analytics-table-card">' +
         '<div class="section-heading"><div><h2>Monthly summary</h2>' +
-        '<p>Uses the established Reading calculations.</p></div></div>' +
+        '<p>Uses the established Reading calculations and the tariff effective for each period.</p></div></div>' +
         '<div class="table-scroll"><table class="analytics-table"><thead><tr>' +
-        '<th>Period</th><th>Solar</th><th>Import</th><th>Export</th><th>Home</th><th>Net</th>' +
+        '<th>Period</th><th>Solar</th><th>Import</th><th>Export</th><th>Home</th><th>Net</th><th>Tariff / Revenue</th>' +
         '</tr></thead><tbody>' +
         rs.map(function (r) {
             var n = r.exp - r.imp;
+            var s = settlement(r);
+            var value;
+            var labelText;
+            var valueClass;
+
+            if (s.type === "export") {
+                value = s.settlementValue;
+                labelText = "Revenue";
+                valueClass = "positive";
+            } else if (s.type === "import") {
+                value = s.bill.total;
+                labelText = "Tariff";
+                valueClass = "negative";
+            } else {
+                value = 0;
+                labelText = "—";
+                valueClass = "balanced";
+            }
 
             return '<tr><td><strong>' +
                 esc(label(r.period, true)) +
@@ -496,7 +447,8 @@ function table(rs) {
                 '</td><td>' + num(r.home, 2) +
                 '</td><td class="' + (n >= 0 ? "positive" : "negative") + '">' +
                 (n > 0 ? "+" : "") + num(n, 2) +
-                '</td></tr>';
+                '</td><td class="tariff-revenue ' + valueClass + '">' +
+                '<strong>' + esc(money(value)) + '</strong><small>' + esc(labelText) + '</small></td></tr>';
         }).join("") +
         '</tbody></table></div></section>';
 }
@@ -535,49 +487,49 @@ export function render() {
 
     return '<section class="page analytics-page">' +
         '<div class="page-header"><div>' +
-            '<p class="eyebrow">Energy & settlement analytics</p>' +
-            '<h1 class="page-title">Analytics</h1>' +
-            '<p class="page-description">Historical energy performance, solar utilization and APSPDCL settlement estimates.</p>' +
+        '<p class="eyebrow">Energy & settlement analytics</p>' +
+        '<h1 class="page-title">Analytics</h1>' +
+        '<p class="page-description">Historical energy performance, solar utilization and APSPDCL settlement estimates.</p>' +
         '</div><div class="analytics-controls">' +
-            '<label><span>Period range</span><select id="analytics-range">' +
-                '<option value="6" ' + (range === "6" ? "selected" : "") + '>Last 6 months</option>' +
-                '<option value="12" ' + (range === "12" ? "selected" : "") + '>Last 12 months</option>' +
-                '<option value="all" ' + (range === "all" ? "selected" : "") + '>All periods</option>' +
-            '</select></label>' +
-            '<label><span>Export settlement rate</span><div class="rate">' +
-                '<span>₹</span><input id="analytics-rate" type="number" min="0" step="0.01" value="' +
-                num(exportRate, 2) + '"><span>/ kWh</span></div></label>' +
+        '<label><span>Period range</span><select id="analytics-range">' +
+        '<option value="6" ' + (range === "6" ? "selected" : "") + '>Last 6 months</option>' +
+        '<option value="12" ' + (range === "12" ? "selected" : "") + '>Last 12 months</option>' +
+        '<option value="all" ' + (range === "all" ? "selected" : "") + '>All periods</option>' +
+        '</select></label>' +
+        '<label><span>Export settlement rate</span><div class="rate settings-rate">' +
+        '<span>₹</span><strong>' + num(getTariffConfig().exportSettlementRate, 2) + '</strong><span>/ kWh</span>' +
+        '</div><a class="analytics-settings-link" href="#/settings">Configure</a></label>' +
         '</div></div>' +
         '<p class="period-note">Showing <strong>' +
-            rs.length + (rs.length === 1 ? " period" : " periods") +
-            '</strong> • Latest <strong>' + esc(label(latest.period, true)) +
-            '</strong> <span class="latest-period-badge">MTD / Latest Reading</span></p>' +
+        rs.length + (rs.length === 1 ? " period" : " periods") +
+        '</strong> • Latest <strong>' + esc(label(latest.period, true)) +
+        '</strong> <span class="latest-period-badge">MTD / Latest Reading</span></p>' +
         '<div class="metrics">' +
-            metric("Solar Generation", num(s, 2) + " kWh", "Selected range", "solar") +
-            metric("Grid Import", num(i, 2) + " kWh", "Selected range", "imp") +
-            metric("Grid Export", num(e, 2) + " kWh", "Selected range", "exp") +
-            metric("Home Consumption", num(h, 2) + " kWh", "Selected range", "home") +
+        metric("Solar Generation", num(s, 2) + " kWh", "Selected range", "solar") +
+        metric("Grid Import", num(i, 2) + " kWh", "Selected range", "imp") +
+        metric("Grid Export", num(e, 2) + " kWh", "Selected range", "exp") +
+        metric("Home Consumption", num(h, 2) + " kWh", "Selected range", "home") +
         '</div>' +
         netPositionSummary(rs) +
         settlementCard(latest) +
         '<section class="card chart-card"><div class="section-heading"><div>' +
-            '<h2>Solar Generation Trend</h2><p>Monthly solar generation.</p></div><span>kWh</span>' +
+        '<h2>Solar Generation Trend</h2><p>Monthly solar generation.</p></div><span>kWh</span>' +
         '</div><div class="chart">' + lineChart(rs) + '</div></section>' +
         '<div class="two"><section class="card chart-card"><div class="section-heading"><div>' +
-            '<h2>Grid Import vs Export</h2><p>Energy drawn from and sent to the grid.</p></div></div>' +
-            '<div class="legend"><span><i class="imp"></i>Import</span><span><i class="exp"></i>Export</span></div>' +
-            '<div class="chart">' + bars(rs) + '</div></section>' +
-            '<section class="card flow-card"><div class="section-heading"><div>' +
-            '<h2>Latest Energy Flow</h2><p>' + esc(label(latest.period, true)) +
-            ' · MTD / Latest Reading</p></div></div><div class="flow">' + flow(latest) +
-            '</div></section></div>' +
+        '<h2>Grid Import vs Export</h2><p>Energy drawn from and sent to the grid.</p></div></div>' +
+        '<div class="legend"><span><i class="imp"></i>Import</span><span><i class="exp"></i>Export</span></div>' +
+        '<div class="chart">' + bars(rs) + '</div></section>' +
+        '<section class="card flow-card"><div class="section-heading"><div>' +
+        '<h2>Latest Energy Flow</h2><p>' + esc(label(latest.period, true)) +
+        ' · MTD / Latest Reading</p></div></div><div class="flow">' + flow(latest) +
+        '</div></section></div>' +
         '<section class="analytics-insights"><div class="section-heading"><div>' +
-            '<h2>Insights</h2><p>Useful ratios for the latest available period · ' +
-            esc(label(latest.period, true)) + '.</p></div></div>' + insights(latest) +
+        '<h2>Insights</h2><p>Useful ratios for the latest available period · ' +
+        esc(label(latest.period, true)) + '.</p></div></div>' + insights(latest) +
         '</section>' +
         table(rs) +
         '<p class="footnote"><strong>Calculation rules:</strong> Grid Import/Export use month-end cumulative baselines; Solar Generation is a direct period value; Home Consumption = Solar Generation + Grid Import − Grid Export.<br>Tariff reference: <a href="https://apspdcl.in/electricity-tariff.php" target="_blank" rel="noopener noreferrer">APSPDCL Electricity Tariff</a>. APSPDCL figures shown here are estimates, not final bills.</p>' +
-    '</section>';
+        '</section>';
 }
 
 function bind() {
@@ -586,9 +538,8 @@ function bind() {
     }
 
     var rangeEl = document.getElementById("analytics-range");
-    var rateEl = document.getElementById("analytics-rate");
 
-    if (!rangeEl && !rateEl) {
+    if (!rangeEl) {
         return;
     }
 
@@ -612,18 +563,6 @@ function bind() {
         });
     }
 
-    if (rateEl) {
-        rateEl.addEventListener("change", function () {
-            var v = Number(rateEl.value);
-
-            exportRate = isFinite(v) && v >= 0
-                ? v
-                : 2.09;
-
-            save();
-            rerender();
-        });
-    }
 }
 
 export function init() {

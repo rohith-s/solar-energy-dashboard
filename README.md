@@ -86,3 +86,7 @@ Co-developed with ChatGPT
 
 
 Current implementation includes Commit 5 History and Commit 6 Dashboard Real Data.
+
+## Commit 9
+
+APSPDCL tariff and net-metering settlement configuration is available under **Settings**. Net position is calculated as Grid Export minus Grid Import. Positive positions use the configured export settlement rate; negative positions use the configured LT-I Domestic telescopic tariff. FPPCA is excluded from estimates.
