@@ -1,0 +1,28 @@
+--- a/js/app.js
++++ b/js/app.js
+@@ -250,11 +250,22 @@
+ 
+ 
+ window.addEventListener(
+   "solar:sync-status",
+-  event => {
+-    const detail = event.detail || {};
+-    updateSyncStatus(detail.ok ? "synced" : "error", detail.ok ? "Synced" : "Sync failed");
++  function (event) {
++    var detail = event.detail || {};
++
++    updateSyncStatus(
++      detail.ok ? "synced" : "error",
++      detail.ok ? "Synced" : "Sync failed"
++    );
++
++    if (detail.ok) {
++      showToast(
++        (detail.message || "Google Sheets sync completed.") +
++        " Dashboard refreshed."
++      );
++    }
+   }
+ );
+ 
+ window.addEventListener(

@@ -511,6 +511,12 @@ export function render() {
         '<span>₹</span><strong>' + num(getTariffConfig().exportSettlementRate, 2) + '</strong><span>/ kWh</span>' +
         '</div><a class="analytics-settings-link" href="#/settings">Configure</a></label>' +
         '</div></div>' +
+        '<section class="analytics-section analytics-range-section">' +
+        '<div class="analytics-section-heading"><div>' +
+        '<p class="eyebrow">Selected period range</p>' +
+        '<h2>Historical range performance</h2>' +
+        '<p>Range totals and monthly settlement results for the selected periods.</p>' +
+        '</div></div>' +
         '<p class="period-note">Showing <strong>' +
         rs.length + (rs.length === 1 ? " period" : " periods") +
         '</strong> • Latest <strong>' + esc(label(latest.period, true)) +
@@ -522,24 +528,30 @@ export function render() {
         metric("Home Consumption", num(h, 2) + " kWh", "Selected range", "home") +
         '</div>' +
         netPositionSummary(rs) +
-        settlementCard(latest) +
         '<section class="card chart-card"><div class="section-heading"><div>' +
         '<h2>Solar Generation Trend</h2><p>Monthly solar generation.</p></div><span>kWh</span>' +
         '</div><div class="chart">' + lineChart(rs) + '</div></section>' +
-        '<div class="analytics-chart-flow">' +
         '<section class="card chart-card grid-import-export-card"><div class="section-heading"><div>' +
         '<h2>Grid Import vs Export</h2><p>Energy drawn from and sent to the grid.</p></div></div>' +
         '<div class="legend"><span><i class="imp"></i>Import</span><span><i class="exp"></i>Export</span></div>' +
         '<div class="chart">' + bars(rs) + '</div></section>' +
-        '<section class="card flow-card latest-energy-flow-card"><div class="section-heading"><div>' +
-        '<h2>Latest Energy Flow</h2><p>' + esc(label(latest.period, true)) +
+        table(rs) +
+        '</section>' +
+        '<section class="analytics-section analytics-current-section">' +
+        '<div class="analytics-section-heading"><div>' +
+        '<p class="eyebrow">Current period</p>' +
+        '<h2>Latest reading & settlement</h2>' +
+        '<p>APSPDCL net position, latest energy flow and insights for the latest available reading.</p>' +
+        '</div></div>' +
+        settlementCard(latest) +
+        '<section class="card flow-card latest-energy-flow-card"><div class="section-heading"><div><h2>Latest Energy Flow</h2><p>' + esc(label(latest.period, true)) +
         ' · MTD / Latest Reading</p></div></div><div class="flow">' + flow(latest) +
-        '</div></section></div>' +
+        '</div></section>' +
         '<section class="analytics-insights"><div class="section-heading"><div>' +
         '<h2>Insights</h2><p>Useful ratios for the latest available period · ' +
         esc(label(latest.period, true)) + '.</p></div></div>' + insights(latest) +
         '</section>' +
-        table(rs) +
+        '</section>' +
         '<p class="footnote"><strong>Calculation rules:</strong> Grid Import/Export use month-end cumulative baselines; Solar Generation is a direct period value; Home Consumption = Solar Generation + Grid Import − Grid Export.<br>Tariff reference: <a href="https://apspdcl.in/electricity-tariff.php" target="_blank" rel="noopener noreferrer">APSPDCL Electricity Tariff</a>. APSPDCL figures shown here are estimates, not final bills.</p>' +
         '</section>';
 }

@@ -251,9 +251,20 @@ document.querySelectorAll(".nav-item").forEach(item => {
 
 window.addEventListener(
   "solar:sync-status",
-  event => {
-    const detail = event.detail || {};
-    updateSyncStatus(detail.ok ? "synced" : "error", detail.ok ? "Synced" : "Sync failed");
+  function (event) {
+    var detail = event.detail || {};
+
+    updateSyncStatus(
+      detail.ok ? "synced" : "error",
+      detail.ok ? "Synced" : "Sync failed"
+    );
+
+    if (detail.ok) {
+      showToast(
+        (detail.message || "Google Sheets sync completed.") +
+        " Dashboard refreshed."
+      );
+    }
   }
 );
 

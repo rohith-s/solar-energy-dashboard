@@ -1,0 +1,82 @@
+--- a/modules/analytics/analytics.css
++++ b/modules/analytics/analytics.css
+@@ -772,5 +772,79 @@
+ 
+ .analytics-table .tariff-revenue.balanced strong,
+ .analytics-table .tariff-revenue.balanced small {
+     color: var(--color-text-soft);
+-}+}
++
++/* P3.1: clearly separate selected-range analytics from current-period details */
++.analytics-section {
++    margin-top: 22px;
++    padding-top: 2px;
++}
++
++.analytics-section:first-of-type {
++    margin-top: 8px;
++}
++
++.analytics-section-heading {
++    display: flex;
++    justify-content: space-between;
++    gap: 12px;
++    margin-bottom: 12px;
++    padding: 0 2px 10px;
++    border-bottom: 1px solid var(--color-border);
++}
++
++.analytics-section-heading h2 {
++    margin: 0;
++    font-size: 17px;
++}
++
++.analytics-section-heading p {
++    margin: 4px 0 0;
++    color: var(--color-text-muted);
++    font-size: 11px;
++}
++
++.analytics-section-heading .eyebrow {
++    margin: 0 0 3px;
++    color: var(--color-primary);
++    font-size: 10px;
++    font-weight: 800;
++    text-transform: uppercase;
++    letter-spacing: .04em;
++}
++
++.analytics-current-section {
++    margin-top: 28px;
++    padding-top: 18px;
++    border-top: 1px solid var(--color-border);
++}
++
++.analytics-current-section .settlement {
++    margin-top: 0;
++}
++
++.analytics-current-section .latest-energy-flow-card,
++.analytics-current-section .analytics-insights {
++    margin-top: 14px;
++}
++
++@media(max-width:767px) {
++    .analytics-section {
++        margin-top: 18px;
++    }
++
++    .analytics-section-heading {
++        padding-left: 0;
++        padding-right: 0;
++    }
++
++    .analytics-section-heading h2 {
++        font-size: 16px;
++    }
++
++    .analytics-current-section {
++        margin-top: 22px;
++        padding-top: 14px;
++    }
++}
