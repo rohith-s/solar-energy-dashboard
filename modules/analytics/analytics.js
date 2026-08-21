@@ -1,5 +1,5 @@
-import { calculateNetSettlement, getTariffConfig, getTariffConfigForPeriod } from "../../js/tariff-engine.js";
-import { calculateReading, getPreviousReading, getReadings } from "../reading/reading.js";
+import { getReadings, getPreviousReading, calculateReading } from "../reading/reading.js";
+import { getTariffConfig, getTariffConfigForPeriod, calculateNetSettlement } from "../../js/tariff-engine.js";
 
 var RANGE_KEY = "solarEnergyDashboard.analytics.range";
 var range = "6";
@@ -365,14 +365,14 @@ function insights(r) {
     var exportPct = r.solar ? r.exp / r.solar * 100 : 0;
 
     return '<div class="insight-grid">' +
-        '<article class="card insight"><span>Solar self-consumption</span>' +
+        '<article class="card insight insight-self"><span>Solar self-consumption</span>' +
         '<strong>' + num(selfPct, 2) + '%</strong><small>' +
         num(self, 2) + ' kWh used at home</small></article>' +
-        '<article class="card insight"><span>Solar Generation Coverage</span>' +
+        '<article class="card insight insight-coverage"><span>Solar Generation Coverage</span>' +
         '<strong>' + num(solarPct, 2) + '%</strong><small>of home consumption</small></article>' +
-        '<article class="card insight"><span>Grid dependency</span>' +
+        '<article class="card insight insight-dependency"><span>Grid dependency</span>' +
         '<strong>' + num(gridPct, 2) + '%</strong><small>of home consumption</small></article>' +
-        '<article class="card insight"><span>Solar export ratio</span>' +
+        '<article class="card insight insight-export"><span>Solar export ratio</span>' +
         '<strong>' + num(exportPct, 2) + '%</strong><small>of solar generation exported</small></article>' +
         '</div>';
 }
@@ -408,13 +408,13 @@ function netPositionSummary(rs) {
         '<div class="net-position-values">' +
         '<div class="net-position-value positive">' +
         '<span>Positive Net</span>' +
-        '<strong>+' + num(positive, 2) + ' kWh</strong>' +
+        '<strong>+' + num(positive, 2) + ' kWh <em>/ ' + esc(money(positiveTariff)) + '</em></strong>' +
         '<small>Sum of positive monthly net positions · Revenue ' +
         esc(money(positiveTariff)) + '</small>' +
         '</div>' +
         '<div class="net-position-value negative">' +
         '<span>Negative Net</span>' +
-        '<strong>' + num(negative, 2) + ' kWh</strong>' +
+        '<strong>' + num(negative, 2) + ' kWh <em>/ ' + esc(money(negativeRevenue)) + '</em></strong>' +
         '<small>Sum of negative monthly net positions · Tariff ' +
         esc(money(negativeRevenue)) + '</small>' +
         '</div>' +
@@ -495,10 +495,9 @@ export function render() {
     var i = sum(rs, "imp");
     var e = sum(rs, "exp");
     var h = sum(rs, "home");
-    var latestLabel = label(latest.period, true);
 
     return '<section class="page analytics-page">' +
-        '<div class="page-header analytics-page-header"><div>' +
+        '<div class="page-header"><div>' +
         '<p class="eyebrow">Energy & settlement analytics</p>' +
         '<h1 class="page-title">Analytics</h1>' +
         '<p class="page-description">Historical energy performance, solar utilization and APSPDCL settlement estimates.</p>' +
@@ -512,12 +511,10 @@ export function render() {
         '<span>₹</span><strong>' + num(getTariffConfig().exportSettlementRate, 2) + '</strong><span>/ kWh</span>' +
         '</div><a class="analytics-settings-link" href="#/settings">Configure</a></label>' +
         '</div></div>' +
-        '<section class="analytics-section analytics-history-section" aria-labelledby="historical-analytics-title">' +
-        '<div class="analytics-section-header"><div>' +
-        '<p class="eyebrow">Selected period range</p>' +
-        '<h2 id="historical-analytics-title">Historical Energy & Settlement Analytics</h2>' +
-        '<p>Showing <strong>' + rs.length + (rs.length === 1 ? " period" : " periods") + '</strong> from the selected range.</p>' +
-        '</div></div>' +
+        '<p class="period-note">Showing <strong>' +
+        rs.length + (rs.length === 1 ? " period" : " periods") +
+        '</strong> • Latest <strong>' + esc(label(latest.period, true)) +
+        '</strong> <span class="latest-period-badge">MTD / Latest Reading</span></p>' +
         '<div class="metrics">' +
         metric("Solar Generation", num(s, 2) + " kWh", "Selected range", "solar") +
         metric("Grid Import", num(i, 2) + " kWh", "Selected range", "imp") +
@@ -525,31 +522,24 @@ export function render() {
         metric("Home Consumption", num(h, 2) + " kWh", "Selected range", "home") +
         '</div>' +
         netPositionSummary(rs) +
+        settlementCard(latest) +
         '<section class="card chart-card"><div class="section-heading"><div>' +
         '<h2>Solar Generation Trend</h2><p>Monthly solar generation.</p></div><span>kWh</span>' +
         '</div><div class="chart">' + lineChart(rs) + '</div></section>' +
-        '<div class="two"><section class="card chart-card"><div class="section-heading"><div>' +
+        '<div class="analytics-chart-flow">' +
+        '<section class="card chart-card grid-import-export-card"><div class="section-heading"><div>' +
         '<h2>Grid Import vs Export</h2><p>Energy drawn from and sent to the grid.</p></div></div>' +
         '<div class="legend"><span><i class="imp"></i>Import</span><span><i class="exp"></i>Export</span></div>' +
-        '<div class="chart">' + bars(rs) + '</div></section></div>' +
-        table(rs) +
-        '</section>' +
-        '<div class="analytics-divider" aria-hidden="true"><span></span><b>Current Period — ' + esc(latestLabel) + '</b><span></span></div>' +
-        '<section class="analytics-section analytics-current-section" aria-labelledby="current-period-title">' +
-        '<div class="analytics-section-header current"><div>' +
-        '<p class="eyebrow">Current month / latest available reading</p>' +
-        '<h2 id="current-period-title">Current Period — ' + esc(latestLabel) + '</h2>' +
-        '<p><span class="latest-period-badge">MTD / Latest Reading</span></p>' +
-        '</div></div>' +
-        settlementCard(latest) +
-        '<section class="card flow-card"><div class="section-heading"><div>' +
-        '<h2>Latest Energy Flow</h2><p>' + esc(latestLabel) + ' · MTD / Latest Reading</p></div></div><div class="flow">' + flow(latest) +
-        '</div></section>' +
+        '<div class="chart">' + bars(rs) + '</div></section>' +
+        '<section class="card flow-card latest-energy-flow-card"><div class="section-heading"><div>' +
+        '<h2>Latest Energy Flow</h2><p>' + esc(label(latest.period, true)) +
+        ' · MTD / Latest Reading</p></div></div><div class="flow">' + flow(latest) +
+        '</div></section></div>' +
         '<section class="analytics-insights"><div class="section-heading"><div>' +
         '<h2>Insights</h2><p>Useful ratios for the latest available period · ' +
-        esc(latestLabel) + '.</p></div></div>' + insights(latest) +
+        esc(label(latest.period, true)) + '.</p></div></div>' + insights(latest) +
         '</section>' +
-        '</section>' +
+        table(rs) +
         '<p class="footnote"><strong>Calculation rules:</strong> Grid Import/Export use month-end cumulative baselines; Solar Generation is a direct period value; Home Consumption = Solar Generation + Grid Import − Grid Export.<br>Tariff reference: <a href="https://apspdcl.in/electricity-tariff.php" target="_blank" rel="noopener noreferrer">APSPDCL Electricity Tariff</a>. APSPDCL figures shown here are estimates, not final bills.</p>' +
         '</section>';
 }
