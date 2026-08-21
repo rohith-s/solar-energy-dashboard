@@ -76,15 +76,16 @@
 }
 
 .dashboard-metric-icon {
-    width: 34px;
-    height: 34px;
+    width: 42px;
+    height: 42px;
     display: inline-grid;
     place-items: center;
-    flex: 0 0 34px;
-    border-radius: 10px;
+    flex: 0 0 42px;
+    border-radius: 12px;
     background: var(--color-surface-2);
     color: var(--color-primary);
-    font-size: 18px;
+    font-size: 24px;
+    line-height: 1;
 }
 
 .dashboard-metric-label {
@@ -99,6 +100,25 @@
     font-size: clamp(22px, 3vw, 30px);
     line-height: 1.1;
     letter-spacing: -.02em;
+}
+
+.dashboard-metric-solar .dashboard-metric-icon,
+.dashboard-metric-solar .dashboard-metric-value {
+    color: var(--color-primary);
+}
+
+.dashboard-metric-import .dashboard-metric-icon,
+.dashboard-metric-import .dashboard-metric-value {
+    color: var(--color-warning);
+}
+
+.dashboard-metric-export .dashboard-metric-icon,
+.dashboard-metric-export .dashboard-metric-value {
+    color: var(--color-success);
+}
+
+.dashboard-metric-home .dashboard-metric-icon {
+    color: #fbbf24;
 }
 
 .dashboard-metric-value.is-unavailable {
@@ -343,10 +363,10 @@
     }
 
     .dashboard-metric-icon {
-        width: 30px;
-        height: 30px;
-        flex-basis: 30px;
-        font-size: 16px;
+        width: 36px;
+        height: 36px;
+        flex-basis: 36px;
+        font-size: 20px;
     }
 
     .dashboard-metric-label {

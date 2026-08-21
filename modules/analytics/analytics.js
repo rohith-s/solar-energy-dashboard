@@ -380,14 +380,23 @@ function insights(r) {
 function netPositionSummary(rs) {
     var positive = 0;
     var negative = 0;
+    var positiveTariff = 0;
+    var negativeRevenue = 0;
 
     rs.forEach(function (r) {
         var net = Number(r.exp || 0) - Number(r.imp || 0);
+        var s = settlement(r);
 
         if (net > 0) {
             positive += net;
+            positiveTariff += Number(s.settlementValue || 0);
         } else if (net < 0) {
             negative += net;
+            negativeRevenue += Number(
+                s.bill && s.bill.total
+                    ? s.bill.total
+                    : 0
+            );
         }
     });
 
@@ -400,12 +409,14 @@ function netPositionSummary(rs) {
         '<div class="net-position-value positive">' +
         '<span>Positive Net</span>' +
         '<strong>+' + num(positive, 2) + ' kWh</strong>' +
-        '<small>Sum of positive monthly net positions</small>' +
+        '<small>Sum of positive monthly net positions · Revenue ' +
+        esc(money(positiveTariff)) + '</small>' +
         '</div>' +
         '<div class="net-position-value negative">' +
         '<span>Negative Net</span>' +
         '<strong>' + num(negative, 2) + ' kWh</strong>' +
-        '<small>Sum of negative monthly net positions</small>' +
+        '<small>Sum of negative monthly net positions · Tariff ' +
+        esc(money(negativeRevenue)) + '</small>' +
         '</div>' +
         '</div>' +
         '</section>';

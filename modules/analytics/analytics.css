@@ -3,16 +3,18 @@
 }
 
 .analytics-controls {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(145px, 1fr) minmax(175px, 1fr);
     gap: 10px;
-    align-items: flex-end;
-    flex-wrap: wrap
+    align-items: start;
+    min-width: 340px
 }
 
 .analytics-controls label {
     display: flex;
     flex-direction: column;
-    gap: 5px
+    gap: 5px;
+    min-width: 0
 }
 
 .analytics-controls label>span {
@@ -31,7 +33,9 @@
 }
 
 .analytics-controls select {
-    min-width: 145px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     padding: 8px 30px 8px 10px
 }
 
@@ -497,11 +501,13 @@
 
     .analytics-controls {
         width: 100%;
+        min-width: 0;
+        grid-template-columns: 1fr;
         align-items: stretch
     }
 
     .analytics-controls label {
-        flex: 1 1 100%
+        width: 100%
     }
 
     .analytics-controls select,
@@ -599,7 +605,12 @@
 
 .net-position-value small {
     font-size: 10px;
-    color: var(--color-text-soft)
+    color: var(--color-text-soft);
+    line-height: 1.5
+}
+
+.net-position-value small::first-line {
+    font-weight: 600
 }
 
 .net-position-value.positive {
@@ -653,7 +664,9 @@
 }
 
 .settings-rate {
-    min-width: 145px;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     justify-content: center;
 }
 
@@ -663,8 +676,8 @@
 }
 
 .analytics-settings-link {
-    align-self: flex-end;
-    margin-top: 4px;
+    align-self: flex-start;
+    margin-top: 2px;
     color: var(--color-primary);
     font-size: 10px;
     font-weight: 800;
