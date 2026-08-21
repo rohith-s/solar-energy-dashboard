@@ -7,6 +7,7 @@
  */
 
 import { CONFIG } from "./config.js";
+import { replaceTariffConfigs } from "./tariff-engine.js";
 
 var STORAGE_KEY = "solarEnergyDashboard.readings";
 
@@ -425,6 +426,14 @@ function mergeReadings(localReadings, remoteReadings) {
     return sortReadings(merged);
 }
 
+function saveRemoteTariffs(tariffs) {
+    if (!Array.isArray(tariffs) || !tariffs.length) {
+        return false;
+    }
+
+    return replaceTariffConfigs(tariffs);
+}
+
 function syncReadings(callback) {
     var localReadings;
 
@@ -462,6 +471,21 @@ function syncReadings(callback) {
                 ? readResult.data.readings
                 : [];
 
+        var remoteTariffs =
+            readResult.data &&
+                Array.isArray(readResult.data.tariffs)
+                ? readResult.data.tariffs
+                : [];
+
+        var tariffsSynced =
+            saveRemoteTariffs(remoteTariffs);
+
+        if (tariffsSynced) {
+            window.dispatchEvent(
+                new CustomEvent("solar:tariff-settings-changed")
+            );
+        }
+
         merged = mergeReadings(
             localReadings,
             remoteReadings
@@ -486,6 +510,8 @@ function syncReadings(callback) {
                     configured: true,
                     synced: true,
                     count: merged.length,
+                    tariffCount: remoteTariffs.length,
+                    tariffsSynced: tariffsSynced,
                     message:
                         "Google Sheets synchronization completed."
                 });

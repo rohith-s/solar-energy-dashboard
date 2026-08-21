@@ -11,7 +11,8 @@
  *
  * The web app should execute as the spreadsheet owner.
  *
- * Commit 7 is append/update synchronization only.
+ * Readings remain append/update synchronized.
+ * Tariff Master and Tariff Slabs are read-only master data for the browser.
  * Deletion propagation is intentionally out of scope.
  */
 
@@ -29,6 +30,43 @@ var HEADERS = [
     "Grid Export Units",
     "Home Consumption",
     "Created At"
+];
+
+var TARIFF_MASTER_SHEET_NAME = "Tariff Master";
+var TARIFF_SLABS_SHEET_NAME = "Tariff Slabs";
+
+var TARIFF_MASTER_HEADERS = [
+    "Tariff Year",
+    "Effective From",
+    "Effective To",
+    "Consumer Category",
+    "Supply Phase",
+    "Recorded MD (kW)",
+    "Fixed Charge (₹/kW)",
+    "Customer Charge (₹/month)",
+    "Export Settlement Rate (₹/kWh)",
+    "FPPCA Included"
+];
+
+var TARIFF_SLAB_HEADERS = [
+    "Tariff Year",
+    "From Unit",
+    "To Unit",
+    "Rate (₹/kWh)"
+];
+
+var DEFAULT_TARIFF_SLABS = [
+    [0, 30, 1.90],
+    [31, 75, 3.00],
+    [76, 125, 4.50],
+    [126, 225, 6.00],
+    [226, 400, 8.75],
+    [401, "", 9.75]
+];
+
+var DEFAULT_TARIFF_MASTER = [
+    ["2025-26", "2025-04-01", "2026-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false],
+    ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false]
 ];
 
 function jsonResponse(payload, callbackName) {
@@ -154,6 +192,208 @@ function ensureHeaders(sheet) {
         range.setFontWeight("bold");
         sheet.setFrozenRows(1);
     }
+}
+
+
+function ensureSheetHeaders(sheet, headers) {
+    var range;
+    var current;
+    var needsUpdate = false;
+    var index;
+
+    if (sheet.getLastRow() === 0) {
+        range = sheet.getRange(1, 1, 1, headers.length);
+        range.setValues([headers]);
+        range.setFontWeight("bold");
+        sheet.setFrozenRows(1);
+        return;
+    }
+
+    range = sheet.getRange(1, 1, 1, headers.length);
+    current = range.getValues()[0];
+
+    for (index = 0; index < headers.length; index += 1) {
+        if (current[index] !== headers[index]) {
+            needsUpdate = true;
+            break;
+        }
+    }
+
+    if (needsUpdate) {
+        range.setValues([headers]);
+        range.setFontWeight("bold");
+        sheet.setFrozenRows(1);
+    }
+}
+
+function getTariffMasterSheet() {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet;
+
+    if (!spreadsheet) {
+        throw new Error(
+            "No active spreadsheet. Bind this Apps Script project to the Solar Energy Dashboard Google Sheet."
+        );
+    }
+
+    sheet = spreadsheet.getSheetByName(TARIFF_MASTER_SHEET_NAME);
+
+    if (!sheet) {
+        sheet = spreadsheet.insertSheet(TARIFF_MASTER_SHEET_NAME);
+    }
+
+    ensureSheetHeaders(sheet, TARIFF_MASTER_HEADERS);
+
+    if (sheet.getLastRow() < 2) {
+        sheet.getRange(
+            2,
+            1,
+            DEFAULT_TARIFF_MASTER.length,
+            TARIFF_MASTER_HEADERS.length
+        ).setValues(DEFAULT_TARIFF_MASTER);
+    }
+
+    return sheet;
+}
+
+function getTariffSlabsSheet() {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet;
+    var rows = [];
+    var tariffIndex;
+    var slabIndex;
+
+    if (!spreadsheet) {
+        throw new Error(
+            "No active spreadsheet. Bind this Apps Script project to the Solar Energy Dashboard Google Sheet."
+        );
+    }
+
+    sheet = spreadsheet.getSheetByName(TARIFF_SLABS_SHEET_NAME);
+
+    if (!sheet) {
+        sheet = spreadsheet.insertSheet(TARIFF_SLABS_SHEET_NAME);
+    }
+
+    ensureSheetHeaders(sheet, TARIFF_SLAB_HEADERS);
+
+    if (sheet.getLastRow() < 2) {
+        for (tariffIndex = 0; tariffIndex < DEFAULT_TARIFF_MASTER.length; tariffIndex += 1) {
+            for (slabIndex = 0; slabIndex < DEFAULT_TARIFF_SLABS.length; slabIndex += 1) {
+                rows.push([
+                    DEFAULT_TARIFF_MASTER[tariffIndex][0],
+                    DEFAULT_TARIFF_SLABS[slabIndex][0],
+                    DEFAULT_TARIFF_SLABS[slabIndex][1],
+                    DEFAULT_TARIFF_SLABS[slabIndex][2]
+                ]);
+            }
+        }
+
+        sheet.getRange(
+            2,
+            1,
+            rows.length,
+            TARIFF_SLAB_HEADERS.length
+        ).setValues(rows);
+    }
+
+    return sheet;
+}
+
+function formatTariffDate(value) {
+    var date;
+
+    if (!value) {
+        return "";
+    }
+
+    if (Object.prototype.toString.call(value) === "[object Date]") {
+        if (isNaN(value.getTime())) {
+            return "";
+        }
+
+        return Utilities.formatDate(
+            value,
+            Session.getScriptTimeZone() || "Asia/Kolkata",
+            "yyyy-MM-dd"
+        );
+    }
+
+    return String(value).substring(0, 10);
+}
+
+function readTariffConfigs() {
+    var masterSheet = getTariffMasterSheet();
+    var slabSheet = getTariffSlabsSheet();
+    var masterLastRow = masterSheet.getLastRow();
+    var slabLastRow = slabSheet.getLastRow();
+    var masters = masterLastRow >= 2
+        ? masterSheet.getRange(
+            2,
+            1,
+            masterLastRow - 1,
+            TARIFF_MASTER_HEADERS.length
+        ).getValues()
+        : [];
+    var slabRows = slabLastRow >= 2
+        ? slabSheet.getRange(
+            2,
+            1,
+            slabLastRow - 1,
+            TARIFF_SLAB_HEADERS.length
+        ).getValues()
+        : [];
+    var slabsByYear = {};
+    var configs = [];
+    var index;
+    var year;
+    var slab;
+
+    for (index = 0; index < slabRows.length; index += 1) {
+        year = String(slabRows[index][0] || "").trim();
+
+        if (!year) {
+            continue;
+        }
+
+        if (!slabsByYear[year]) {
+            slabsByYear[year] = [];
+        }
+
+        slab = {
+            from: Number(slabRows[index][1] || 0),
+            to: slabRows[index][2] === "" || slabRows[index][2] === null
+                ? null
+                : Number(slabRows[index][2]),
+            rate: Number(slabRows[index][3] || 0)
+        };
+
+        slabsByYear[year].push(slab);
+    }
+
+    for (index = 0; index < masters.length; index += 1) {
+        year = String(masters[index][0] || "").trim();
+
+        if (!year) {
+            continue;
+        }
+
+        configs.push({
+            tariffYear: year,
+            effectiveFrom: formatTariffDate(masters[index][1]),
+            effectiveTo: formatTariffDate(masters[index][2]),
+            consumerCategory: String(masters[index][3] || ""),
+            supplyPhase: String(masters[index][4] || ""),
+            recordedMdKw: Number(masters[index][5] || 0),
+            fixedChargePerKw: Number(masters[index][6] || 0),
+            customerCharge: Number(masters[index][7] || 0),
+            exportSettlementRate: Number(masters[index][8] || 0),
+            includeFppca: false,
+            slabs: slabsByYear[year] || []
+        });
+    }
+
+    return configs;
 }
 
 function toReading(row) {
@@ -338,7 +578,17 @@ function doGet(e) {
             return jsonResponse({
                 ok: true,
                 readings:
-                    readAllReadings()
+                    readAllReadings(),
+                tariffs:
+                    readTariffConfigs()
+            }, callbackName);
+        }
+
+        if (action === "tariffs") {
+            return jsonResponse({
+                ok: true,
+                tariffs:
+                    readTariffConfigs()
             }, callbackName);
         }
 

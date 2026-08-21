@@ -16,6 +16,7 @@ function isRefreshableRoute() {
         hash.indexOf("#/dashboard") === 0 ||
         hash.indexOf("#/history") === 0 ||
         hash.indexOf("#/analytics") === 0 ||
+        hash.indexOf("#/settings") === 0 ||
         hash === "" ||
         hash === "#/"
     );
@@ -45,7 +46,9 @@ function notifySync(result) {
         message =
             "Google Sheets synchronized (" +
             result.count +
-            " readings).";
+            " readings, " +
+            (result.tariffCount || 0) +
+            " tariffs).";
     } else {
         message =
             "Google Sheets sync unavailable. Local data is still available.";

@@ -265,7 +265,10 @@ window.addEventListener(
 window.addEventListener(
   "solar:tariff-settings-changed",
   () => {
-    if (currentRoute() === "analytics") {
+    if (
+      currentRoute() === "analytics" ||
+      currentRoute() === "settings"
+    ) {
       render();
     }
   }

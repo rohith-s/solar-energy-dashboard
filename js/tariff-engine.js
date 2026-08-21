@@ -2,6 +2,7 @@
  * Solar Energy Dashboard
  * APSPDCL tariff and settlement engine
  * Commit 9 - Versioned tariff configuration
+ * P2 - Google Sheets Tariff Master is the source of truth; Local Storage is cache/fallback.
  */
 
 import { CONFIG } from "./config.js";
@@ -318,6 +319,40 @@ export function getTariffConfigForPeriod(period) {
 
 export function getTariffConfig() {
     return getTariffConfigForDate(todayIso());
+}
+
+export function replaceTariffConfigs(values) {
+    var configs = Array.isArray(values)
+        ? values.map(function (item) {
+            return normalizeConfig(item);
+        }).filter(function (item) {
+            return item.tariffYear &&
+                item.effectiveFrom &&
+                item.effectiveTo &&
+                Array.isArray(item.slabs) &&
+                item.slabs.length > 0;
+        })
+        : [];
+    var current;
+
+    if (!configs.length) {
+        return false;
+    }
+
+    if (!writeVersions(configs)) {
+        return false;
+    }
+
+    current = getTariffConfig();
+
+    try {
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(current)
+        );
+    } catch (error) {}
+
+    return true;
 }
 
 export function saveTariffConfig(value) {
