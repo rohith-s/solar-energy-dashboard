@@ -1,92 +1,184 @@
-# ☀ Solar Energy Dashboard
+# Solar Energy Dashboard
 
-A Progressive Web Application (PWA) for monitoring residential solar energy generation,
-grid import/export, APSPDCL net-metering calculations, and monthly energy analytics.
-
----
+A lightweight web-based Solar Energy Dashboard for recording, analysing and
+tracking household solar generation, grid import/export and APSPDCL energy
+settlement.
 
 ## Features
 
-### Current Version (In Development)
+- Dashboard with current energy position
+- Manual meter reading entry
+- Month-end cumulative meter baseline handling
+- Solar Generation as a direct period value
+- Home Consumption calculation
+- Reading history
+- Historical analytics
+- APSPDCL net energy position
+- Positive/negative net settlement analysis
+- Configurable export settlement rate
+- Effective-date based tariff management
+- Google Sheets synchronization
+- Google Sheets tariff master
+- Responsive laptop and Android/mobile UI
 
-- Responsive Dashboard
-- Google Sheets Synchronization
-- APSPDCL Bill Estimation
-- Solar Analytics
-- Reading History
-- Monthly Closing
-- Installable Progressive Web App (PWA)
-- Offline Support
-- Android & Windows Compatible
+## Energy Calculation Rules
 
----
+### Grid Import
 
-## Technology Stack
+For cumulative grid meters:
 
-| Layer | Technology |
-|--------|------------|
-| Frontend | HTML5 |
-| Styling | CSS3 |
-| JavaScript | ES Modules |
-| Charts | Chart.js |
-| Backend | Google Apps Script |
-| Storage | Google Sheets |
-| Hosting | GitHub Pages |
-| Mobile | Progressive Web App |
+Grid Import Units =
+Current Reading - Previous Month-End Reading
 
----
+### Grid Export
 
-## Folder Structure
+For cumulative grid meters:
 
+Grid Export Units =
+Current Reading - Previous Month-End Reading
+
+### Solar Generation
+
+Solar Generation is stored as the direct value for the current
+month/period.
+
+### Home Consumption
+
+Home Consumption =
+Solar Generation + Grid Import Units - Grid Export Units
+
+### APSPDCL Net Energy Position
+
+Net Energy Position =
+Grid Export Units - Grid Import Units
+
+Positive value:
+- Net export to APSPDCL
+- Settlement/revenue calculation applies
+
+Negative value:
+- Net import from APSPDCL
+- Tariff calculation applies
+
+## Tariff Management
+
+Tariffs are maintained in Google Sheets and selected according to their
+effective date.
+
+Example:
+
+| Tariff | Effective From | Effective To |
+|---|---|---|
+| 2025-26 | 01-Apr-2025 | 31-Mar-2026 |
+| 2026-27 | 01-Apr-2026 | 31-Mar-2027 |
+| 2027-28 | 01-Apr-2027 | 31-Mar-2028 |
+
+Adding a future tariff year does not require a JavaScript code change.
+
+Google Sheets is the source of truth.
+
+Local Storage is used as a cache/offline fallback.
+
+## Google Sheets
+
+The Google Spreadsheet contains separate areas for:
+
+### Solar Energy Dashboard
+
+Stores meter readings.
+
+Current columns:
+
+- ID
+- Reading Date
+- Grid Import
+- Grid Export
+- Solar Generation
+- Month End
+- Solar Generation Units
+- Grid Import Units
+- Grid Export Units
+- Home Consumption
+- Created At
+
+### Tariff Master
+
+Stores one configuration row per tariff year, including:
+
+- Tariff version
+- Effective From
+- Effective To
+- Connection type
+- Phase
+- Contract/recorded MD
+- Fixed/customer charges
+- Export settlement rate
+
+### Tariff Slabs
+
+Stores slab-wise energy tariff rates for each tariff version.
+
+## Google Apps Script
+
+The project uses a Google Apps Script Web App as the API layer between
+the browser and Google Sheets.
+
+The browser communicates with the deployed Apps Script Web App rather
+than directly accessing the spreadsheet.
+
+After synchronization:
+
+1. Readings are retrieved.
+2. Tariff configuration is retrieved.
+3. Local Storage is updated.
+4. Dashboard/Analytics data is refreshed.
+5. A sync completion confirmation is displayed.
+
+## Local Storage
+
+Local Storage is used for application caching.
+
+Important keys include:
+
+- `solarEnergyDashboard.tariffConfigs`
+- `solarEnergyDashboard.tariffConfig`
+
+These values should not be treated as the primary tariff master.
+
+Google Sheets remains the source of truth.
+
+## FPPCA
+
+FPPCA is currently excluded from calculations because the required
+calculation methodology has not been configured.
+
+## Responsive UI
+
+The application supports:
+
+- Laptop/Desktop
+- Tablet
+- Android/mobile
+
+Mobile navigation uses the hamburger menu.
+
+## Development
+
+The application is a client-side JavaScript application and can be
+run locally using a simple web server.
+
+### Run the Local Development Server
+
+The application can be served locally using Python's built-in HTTP server.
+
+From the project root directory, run:
+
+```bash
+python -m http.server 8080
 ```
-solar-energy-dashboard/
 
-├── assets/
-├── css/
-├── docs/
-├── google-apps-script/
-├── js/
-├── modules/
-├── index.html
-├── manifest.json
-├── service-worker.js
-└── README.md
+Example:
+
+```text
+http://localhost:8080
 ```
-
----
-
-## Roadmap
-
-### Sprint 1
-
-- Foundation
-- PWA
-- Google Sync
-- Reading Entry
-
-### Sprint 2
-
-- Dashboard
-- Charts
-- Analytics
-
-### Sprint 3
-
-- APSPDCL Billing
-- Forecast
-- Reports
-
----
-
-## Author
-
-Rohith S
-
-Co-developed with ChatGPT
-
-
-Current implementation includes Commit 5 History and Commit 6 Dashboard Real Data.
-
-## Commit 9
-
-APSPDCL tariff and net-metering settlement configuration is available under **Settings**. Net position is calculated as Grid Export minus Grid Import. Positive positions use the configured export settlement rate; negative positions use the configured LT-I Domestic telescopic tariff. FPPCA is excluded from estimates.
