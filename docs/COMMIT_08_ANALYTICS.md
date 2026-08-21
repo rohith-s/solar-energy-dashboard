@@ -1,36 +1,29 @@
 # Commit 8 — Analytics
 
 ## Status
-Planned.
-
-## Purpose
-
-Provide useful historical analysis based on saved readings.
+Implemented / Preview
 
 ## Scope
+- Monthly Solar Generation, Grid Import, Grid Export and Home Consumption.
+- Last 6 months default, Last 12 months and All periods.
+- Solar generation trend chart.
+- Grid import vs export chart.
+- Latest energy-flow view.
+- Solar self-consumption, solar contribution, grid dependency and export ratio.
+- Net Grid Position = Grid Export - Grid Import.
+- Positive net position is green; negative is red.
+- Export settlement rate is editable, default ₹2.09/kWh, and persisted locally.
+- Indicative APSPDCL domestic telescopic estimate for net import.
 
-Potential analytics:
-
-- Monthly Solar Generation.
-- Monthly Grid Import.
-- Monthly Grid Export.
-- Monthly Home Consumption.
-- Trend comparisons.
-- Period summaries.
-- Useful ratios/insights derived from the established calculations.
-
-## Requirements
-
-Analytics must use the confirmed data model:
-
-- Grid Import/Export usage is based on month-end cumulative baselines.
-- Solar Generation is a direct monthly/period value.
+## Confirmed data model
+- Grid Import/Export usage uses month-end cumulative baselines.
+- Solar Generation is a direct period value.
 - Home Consumption = Solar Generation + Grid Import - Grid Export.
 
-Charts must remain readable on laptop and Android.
+## Financial estimate note
+The APSPDCL result is indicative, not a final bill or guaranteed settlement. It excludes consumer-specific adjustments, arrears, subsidies, taxes and other charges. Current-year tariff references are the APSPDCL tariff page and APERC FY2026-27 tariff order.
 
 ## Out of scope
-
 - Changing meter calculation rules.
-- Tariff configuration.
+- Google Sheets synchronization changes.
 - PWA implementation.

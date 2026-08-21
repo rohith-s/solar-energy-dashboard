@@ -13,6 +13,8 @@ import {
   render as renderHistory
 } from "../modules/history/history.js";
 
+import { init as initAnalytics, render as renderAnalytics } from "../modules/analytics/analytics.js";
+
 const ROUTES = {
   dashboard: renderDashboard,
 
@@ -20,12 +22,7 @@ const ROUTES = {
 
   history: renderHistory,
 
-  analytics: () =>
-    renderPlaceholder(
-      "Analytics",
-      "▣",
-      "Charts and monthly analytics will be implemented after readings are available."
-    ),
+  analytics: renderAnalytics,
 
   settings: () =>
     renderPlaceholder(
@@ -160,6 +157,7 @@ function render() {
         window.location.hash = "#/reading";
       });
     }
+    if (route === "analytics") { initAnalytics(); }
 
     updateActiveNavigation(route);
     updateHeaderMonth();
