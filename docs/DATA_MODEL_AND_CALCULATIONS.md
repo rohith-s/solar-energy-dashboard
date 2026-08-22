@@ -69,20 +69,20 @@ If a previous month-end exists:
 
 ## Current example
 
-July month-end:
+previous month-end:
 
-`2078.00`, `2312.00`, `413.10`
+`1000.00`, `1200.00`, `150.00`
 
-August period:
+sample period:
 
-`2217.52`, `2487.50`, `283.50`
+`1100.00`, `1250.00`, `160.00`
 
 Results:
 
-- Solar Generation = 283.50
-- Grid Import = 139.52
-- Grid Export = 175.50
-- Home Consumption = 247.52
+- Solar Generation = 160.00
+- Grid Import = 100.00
+- Grid Export = 50.00
+- Home Consumption = 210.00
 
 ## Critical rule
 

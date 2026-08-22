@@ -44,30 +44,30 @@ The previous solar value is not subtracted.
 
 ## Confirmed example
 
-Previous month-end: 31-Jul-2026
+Previous month-end: 31-Jul-YYYY
 
-- Grid Import: 2078.00
-- Grid Export: 2312.00
-- Solar Generation: 413.10
+- Grid Import: 1000.00
+- Grid Export: 1200.00
+- Solar Generation: 150.00
 
-Current period: 18-Aug-2026
+Current period: 18-Aug-YYYY
 
-- Grid Import: 2217.52
-- Grid Export: 2487.50
-- Solar Generation: 283.50
+- Grid Import: 1100.00
+- Grid Export: 1250.00
+- Solar Generation: 160.00
 
 Result:
 
-- Solar Generation: 283.50 kWh
-- Grid Import: 139.52 kWh
-- Grid Export: 175.50 kWh
-- Home Consumption: 247.52 kWh
+- Solar Generation: 160.00 kWh
+- Grid Import: 100.00 kWh
+- Grid Export: 50.00 kWh
+- Home Consumption: 210.00 kWh
 
 ## Validation
 
-A non-month-end reading such as 18-Aug-2026 must not become the previous baseline for a later reading.
+A non-month-end reading such as 18-Aug-YYYY must not become the previous baseline for a later reading.
 
-If 31-Aug-2026 is saved as month-end, a subsequent September reading should use 31-Aug-2026 as its previous baseline.
+If 31-Aug-YYYY is saved as month-end, a subsequent following-period reading should use 31-Aug-YYYY as its previous baseline.
 
 ## Repository practice
 

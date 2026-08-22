@@ -51,10 +51,10 @@ For duplicate dates, use deterministic `createdAt` ordering.
 
 Use the current Local Storage sample:
 
-31-Jul-2026 and 18-Aug-2026.
+31-Jul-YYYY and 18-Aug-YYYY.
 
 The latest record should appear first.
 
-18-Aug should show Solar Generation = 283.50 kWh and Home Consumption = 247.52 kWh.
+18-Aug should show Solar Generation = 160.00 kWh and Home Consumption = 210.00 kWh.
 
 31-Jul should show its saved calculation values.

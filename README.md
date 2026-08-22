@@ -134,6 +134,13 @@ After synchronization:
 4. Dashboard/Analytics data is refreshed.
 5. A sync completion confirmation is displayed.
 
+
+## Public repository / GitHub Pages security note
+
+The frontend contains the deployed Google Apps Script Web App URL so the browser can synchronize with Google Sheets. That URL is an endpoint, not a Google API secret, but the current Apps Script deployment also exposes synchronization write operations to anonymous callers.
+
+**Do not treat the current backend as a public production API or expose the repository publicly until the Apps Script write path is restricted/authenticated.** Never place Google OAuth client secrets, service-account private keys, passwords, or other private credentials in frontend files.
+
 ## Local Storage
 
 Local Storage is used for application caching.

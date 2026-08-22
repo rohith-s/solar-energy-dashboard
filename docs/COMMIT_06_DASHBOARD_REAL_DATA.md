@@ -89,16 +89,16 @@ The dashboard uses a four-column KPI layout on larger screens, a two-column KPI 
 
 Using the established sample:
 
-- 31-Jul-2026 month-end Grid Import = 2078.00
-- 31-Jul-2026 month-end Grid Export = 2312.00
-- 18-Aug-2026 Grid Import = 2217.52
-- 18-Aug-2026 Grid Export = 2487.50
-- 18-Aug-2026 Solar Generation = 283.50
+- 31-Jul-YYYY month-end Grid Import = 1000.00
+- 31-Jul-YYYY month-end Grid Export = 1200.00
+- 18-Aug-YYYY Grid Import = 1100.00
+- 18-Aug-YYYY Grid Export = 1250.00
+- 18-Aug-YYYY Solar Generation = 160.00
 
 The dashboard shows:
 
-- Solar Generation = 283.50 kWh
-- Grid Import = 139.52 kWh
-- Grid Export = 175.50 kWh
-- Home Consumption = 247.52 kWh
-- Baseline date = 31-Jul-2026
+- Solar Generation = 160.00 kWh
+- Grid Import = 100.00 kWh
+- Grid Export = 50.00 kWh
+- Home Consumption = 210.00 kWh
+- Baseline date = 31-Jul-YYYY

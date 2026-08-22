@@ -19,28 +19,28 @@ Provide historical analysis based on saved readings without changing the establi
 
 ## Net Position Summary verification
 
-Using the current verified readings through August 2026:
+Using an illustrative sample dataset:
 
 | Range | Periods | Positive Net | Negative Net | Net Balance |
 |---|---:|---:|---:|---:|
-| Last 6 months | Mar–Aug 2026 | +384.57 kWh | -316.00 kWh | +68.57 kWh |
-| Last 12 months | Jan–Aug 2026 | +544.57 kWh | -316.00 kWh | +228.57 kWh |
-| All periods | Jan–Aug 2026 | +544.57 kWh | -316.00 kWh | +228.57 kWh |
+| Last 6 months | sample range | +200.00 kWh | -150.00 kWh | +50.00 kWh |
+| Last 12 months | sample range | +300.00 kWh | -150.00 kWh | +150.00 kWh |
+| All periods | sample range | +300.00 kWh | -150.00 kWh | +150.00 kWh |
 
 The dashboard's two-value summary intentionally shows only **Positive Net** and **Negative Net**. The net balance is included here only as a verification check and is not rendered as a third summary value.
 
 ## Current latest period verification
 
-The latest available reading is **August 2026** (20-Aug-2026), so the dashboard labels it **MTD / Latest Reading**.
+The latest available sample reading is labelled **MTD / Latest Reading** when the latest period is not month-end.
 
-Latest August values:
+Illustrative latest-period values:
 
-- Solar Generation: **309.40 kWh**
-- Grid Import: **157.26 kWh**
-- Grid Export: **192.83 kWh**
-- Home Consumption: **273.83 kWh**
-- Net Export: **+35.57 kWh**
-- Settlement at ₹2.09/kWh: **₹74.34**
+- Solar Generation: **160.00 kWh**
+- Grid Import: **100.00 kWh**
+- Grid Export: **150.00 kWh**
+- Home Consumption: **210.00 kWh**
+- Net Export: **+50.00 kWh**
+- Settlement at ₹2.09/kWh: **₹104.50**
 
 ## Out of scope
 

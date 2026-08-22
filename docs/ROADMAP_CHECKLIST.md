@@ -7,10 +7,10 @@
 
 ## Next
 
-- [ ] Commit 5 — History
-- [ ] Commit 6 — Dashboard Real Data
-- [ ] Commit 7 — Google Sheets
-- [ ] Commit 8 — Analytics
+- [x] Commit 5 — History
+- [x] Commit 6 — Dashboard Real Data
+- [x] Commit 7 — Google Sheets
+- [x] Commit 8 — Analytics
 - [x] Commit 9 — Settings / Tariff Configuration
 - [ ] Commit 10 — PWA / Offline / Installability
 
@@ -24,9 +24,9 @@
 - [x] Solar Generation is a direct monthly/period value.
 - [x] Home Consumption = Solar + Grid Import - Grid Export.
 - [x] Reading data persists in Local Storage.
-- [ ] History reads saved records.
-- [ ] Dashboard reads real data.
-- [ ] Google Sheets synchronization.
-- [ ] Analytics.
+- [x] History reads saved records.
+- [x] Dashboard reads real data.
+- [x] Google Sheets synchronization.
+- [x] Analytics.
 - [x] Tariff/settings.
 - [ ] PWA/offline/installability.

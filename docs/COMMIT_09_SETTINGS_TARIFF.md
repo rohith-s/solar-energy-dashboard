@@ -42,9 +42,9 @@ The displayed net position retains its calculated decimal precision.
 
 For tariff / settlement calculations only, net units are rounded to the nearest whole unit:
 
-- 34.40 → 34 units
-- 34.50 → 35 units
-- 34.60 → 35 units
+- 30.40 → 30 units
+- 30.50 → 31 units
+- 30.60 → 31 units
 
 The displayed Net value is not rounded this way.
 
@@ -80,15 +80,15 @@ The Monthly summary now includes **Tariff / Revenue**:
 
 Each row selects its tariff by the period's effective tariff date, so historical months continue to use the tariff that applied during that period.
 
-## August 2026 acceptance test
+## sample period acceptance test
 
 For the test reading:
 
-- Grid Export: 192.83 kWh
-- Grid Import: 227.23 kWh
-- Net Import: **-34.40 kWh**
-- Tariff units: **34 kWh**
-- Energy charge: **₹69.00**
+- Grid Export: 150.00 kWh
+- Grid Import: 180.00 kWh
+- Net Import: **-30.00 kWh**
+- Tariff units: **30 kWh**
+- Energy charge: **₹60.00**
 - Fixed charge: **₹40.00**
 - Customer charge: **₹30.00**
-- Estimated APSPDCL charge: **₹139.00**
+- Estimated APSPDCL charge: **₹130.00**

@@ -15,11 +15,11 @@
 | 3 | Reading Entry + Calculation Engine | ✅ Completed |
 | 4 | Month-End Previous Reading + Period Calculation | ✅ Completed |
 | 5 | History | ⏭ Next |
-| 6 | Dashboard — Real Data | Planned |
-| 7 | Google Sheets | Planned |
-| 8 | Analytics | Planned |
-| 9 | Settings / Tariff Configuration | Planned |
-| 10 | PWA / Offline / Installability | Planned |
+| 6 | Dashboard — Real Data | Completed |
+| 7 | Google Sheets | Completed |
+| 8 | Analytics | Completed |
+| 9 | Settings / Tariff Configuration | Completed |
+| 10 | PWA / Offline / Installability | Next |
 
 > Note: The original roadmap called the History work "Commit 4". Commit 4 was already used for the month-end/calculation correction, so the repository should retain its actual commit history. The functional roadmap therefore continues with Commit 5 = History.
 
@@ -71,26 +71,26 @@ A non-month-end reading must never become the previous baseline.
 
 ## Current confirmed example
 
-31-Jul-2026:
+31-Jul-YYYY:
 
-- Grid Import: 2078.00
-- Grid Export: 2312.00
-- Solar Generation: 413.10
+- Grid Import: 1000.00
+- Grid Export: 1200.00
+- Solar Generation: 150.00
 - Month End: Yes
 
-18-Aug-2026:
+18-Aug-YYYY:
 
-- Grid Import: 2217.52
-- Grid Export: 2487.50
-- Solar Generation: 283.50
+- Grid Import: 1100.00
+- Grid Export: 1250.00
+- Solar Generation: 160.00
 - Month End: No
 
 For the 18-Aug period:
 
-- Solar Generation = 283.50 kWh
-- Grid Import = 2217.52 - 2078.00 = 139.52 kWh
-- Grid Export = 2487.50 - 2312.00 = 175.50 kWh
-- Home Consumption = 283.50 + 139.52 - 175.50 = 247.52 kWh
+- Solar Generation = 160.00 kWh
+- Grid Import = 1100.00 - 1000.00 = 100.00 kWh
+- Grid Export = 1250.00 - 1200.00 = 50.00 kWh
+- Home Consumption = 160.00 + 100.00 - 50.00 = 210.00 kWh
 
 ## Development principle
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Implementation ready; manual Google setup is required before synchronization can be enabled.
+Implemented; manual Google setup is required for synchronization.
 
 ## Purpose
 
@@ -94,7 +94,7 @@ The calculation values are stored so the synchronized record preserves the exact
 
 Do not put a Google OAuth private client secret, service-account private key, or other private credential in frontend JavaScript.
 
-The Commit 7 Apps Script endpoint is intended for the application's controlled/personal deployment. If the application is later exposed publicly, replace the unrestricted web-app deployment with an authenticated OAuth-based architecture before treating the synchronization endpoint as production-grade.
+The current Apps Script Web App supports anonymous browser synchronization, including write operations. It is suitable for a controlled/personal deployment, but it must not be treated as a public production API. Before publishing the application for general public access, protect write operations with an authenticated architecture or otherwise restrict the backend deployment.
 
 ## Manual setup
 
