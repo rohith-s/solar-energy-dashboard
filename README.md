@@ -137,7 +137,20 @@ After synchronization:
 
 ## Public repository / GitHub Pages security note
 
-The frontend contains the deployed Google Apps Script Web App URL so the browser can synchronize with Google Sheets. That URL is an endpoint, not a Google API secret, but the current Apps Script deployment also exposes synchronization write operations to anonymous callers.
+The frontend contains the deployed Google Apps Script Web App URL because the browser needs a public read path for readings and tariff configuration. The URL is an endpoint, not a Google API secret.
+
+The synchronization write path is separate from the public read path. Write requests must use the authenticated Apps Script deployment and the signed-in Google account configured in the Apps Script `WRITE_ALLOWED_EMAIL` script property. No password, API key, OAuth token, or write secret is stored in the frontend.
+
+Before making the GitHub repository public:
+
+1. Keep the public read deployment available for anonymous reads.
+2. Create a separate Apps Script web-app deployment for authenticated writes.
+3. Configure the write deployment to run as the accessing user and allow signed-in users.
+4. Set the Apps Script `WRITE_ALLOWED_EMAIL` script property to the Google account allowed to modify readings.
+5. Set `GOOGLE_SCRIPT_WRITE_URL` in `js/config.js` to the authenticated write deployment URL.
+6. Verify anonymous reads, authorized writes, and unauthorized write rejection.
+
+Google Sheets remains the source of truth for readings and tariff master data.
 
 **Do not treat the current backend as a public production API or expose the repository publicly until the Apps Script write path is restricted/authenticated.** Never place Google OAuth client secrets, service-account private keys, passwords, or other private credentials in frontend files.
 

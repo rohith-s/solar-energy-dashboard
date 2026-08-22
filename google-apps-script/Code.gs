@@ -9,7 +9,14 @@
  * Sheet used by this API:
  *   Solar Energy Dashboard
  *
- * The web app should execute as the spreadsheet owner.
+ * Deployment model:
+ *   - Public read deployment: anonymous reads are allowed.
+ *   - Authenticated write deployment: signed-in users are allowed to
+ *     reach the web app, but only WRITE_ALLOWED_EMAIL may synchronize.
+ *
+ * The write deployment should execute as the user accessing the web app.
+ * WRITE_ALLOWED_EMAIL is stored in Apps Script Script Properties and is
+ * intentionally not committed to the repository.
  *
  * Readings remain append/update synchronized.
  * Tariff Master and Tariff Slabs are read-only master data for the browser.
@@ -68,6 +75,46 @@ var DEFAULT_TARIFF_MASTER = [
     ["2025-26", "2025-04-01", "2026-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false],
     ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false]
 ];
+var WRITE_ALLOWED_EMAIL_PROPERTY = "WRITE_ALLOWED_EMAIL";
+
+function requireAuthorizedWriter() {
+    var allowedEmails = String(
+        PropertiesService
+            .getScriptProperties()
+            .getProperty(WRITE_ALLOWED_EMAIL_PROPERTY) || ""
+    )
+        .split(",")
+        .map(function (email) {
+            return email.trim().toLowerCase();
+        })
+        .filter(function (email) {
+            return email !== "";
+        });
+
+    var activeEmail = String(
+        Session.getActiveUser().getEmail() || ""
+    )
+        .trim()
+        .toLowerCase();
+
+    if (!allowedEmails.length) {
+        throw new Error(
+            "Write access is not configured. Set the WRITE_ALLOWED_EMAIL script property."
+        );
+    }
+
+    if (!activeEmail) {
+        throw new Error(
+            "Google sign-in is required for synchronization writes."
+        );
+    }
+
+    if (allowedEmails.indexOf(activeEmail) === -1) {
+        throw new Error(
+            "You are not authorized to modify Solar Energy Dashboard data."
+        );
+    }
+}
 
 function jsonResponse(payload, callbackName) {
     var body = JSON.stringify(payload);
@@ -593,6 +640,8 @@ function doGet(e) {
         }
 
         if (action === "sync") {
+            requireAuthorizedWriter();
+
             var payload = parsePayload(
                 getParameter(e, "payload")
             );
@@ -641,6 +690,8 @@ function doGet(e) {
 
 function doPost(e) {
     try {
+        requireAuthorizedWriter();
+
         var body =
             e &&
             e.postData &&

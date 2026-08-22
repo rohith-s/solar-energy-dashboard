@@ -4,24 +4,62 @@
 
 The frontend contains no detected passwords, private keys, OAuth client secrets, service-account keys, or other credential material.
 
-The deployed Google Apps Script URL in `js/config.js` is an endpoint, not a private credential. However, the current Apps Script code exposes anonymous read and synchronization write operations. A public GitHub repository would make the endpoint easy to discover, but the endpoint is already callable by anyone who knows its URL.
+The deployed Google Apps Script URL is an endpoint, not a private credential. The application now separates the public read endpoint from the authenticated write endpoint.
 
-## Blocker before making the repository public
+## Backend write protection
 
-Do not publish the repository publicly until the Apps Script write path is restricted/authenticated.
+Synchronization writes are protected by the Apps Script backend. The write path requires:
 
-The frontend cannot safely solve this by embedding a secret: any secret shipped in browser JavaScript is visible to users.
+- A signed-in Google account.
+- A matching `WRITE_ALLOWED_EMAIL` Apps Script Script Property.
+- A separate authenticated web-app deployment for writes.
 
-## Cleanup performed
+The allowed email is stored in Apps Script Script Properties and is not committed to GitHub.
 
-- Removed unrelated payment receipt and solar-plant report exports.
-- Removed local browser/server logs and PID artifacts.
-- Removed obsolete/empty reading module artifacts.
-- Removed the local seed page containing sample household readings.
-- Sanitized user-specific meter values from public documentation examples.
-- Repaired and strengthened `.gitignore` rules for generated/local artifacts.
-- Updated stale project documentation where practical.
+The browser does not receive or store a password, API key, OAuth token, or other write secret.
 
-## Recommended next security change
+## Public read path
 
-Keep the repository private for now. Harden the Apps Script backend so public frontend access can use a read-only path, while synchronization writes require an authenticated/trusted path. After that change is tested, GitHub Pages can be enabled safely for the intended audience.
+The public deployment remains read-only from the application's security perspective:
+
+- `action=readings` returns readings and tariff configuration.
+- `action=tariffs` returns tariff configuration.
+- `action=health` returns service status.
+- `action=sync` is rejected unless the caller is authorized by the write guard.
+
+Because the read endpoint is public, the Google Sheets data returned by that endpoint should be treated as publicly readable. Do not place private information in the exposed sheets.
+
+## Required deployment configuration
+
+### Public read deployment
+
+- Execute as: deployment owner
+- Who has access: anyone, including anonymous users
+
+### Authenticated write deployment
+
+- Execute as: user accessing the web app
+- Who has access: any signed-in user
+- Backend authorization: `Session.getActiveUser().getEmail()` must match `WRITE_ALLOWED_EMAIL`
+
+## Frontend configuration
+
+`js/config.js` contains two endpoint settings:
+
+- `GOOGLE_SCRIPT_READ_URL` — public read deployment
+- `GOOGLE_SCRIPT_WRITE_URL` — authenticated write deployment
+
+Neither setting contains a secret.
+
+## Verification required before making the repository public
+
+1. Anonymous browser can read dashboard data and tariff configuration.
+2. Authorized Google account can add/update a reading and synchronize it.
+3. Unauthorized signed-in Google account cannot synchronize a reading.
+4. Public read deployment rejects `action=sync` without authorization.
+5. No secrets are present in Git history or frontend configuration.
+6. Only intended personal/non-sensitive data is exposed through the public read endpoint.
+
+## Status
+
+The code changes for the protected write path are prepared. The Apps Script deployment configuration and `WRITE_ALLOWED_EMAIL` property must be completed and tested before the repository is changed from private to public.

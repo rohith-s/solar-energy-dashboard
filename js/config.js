@@ -19,7 +19,14 @@ export const CONFIG = Object.freeze({
 
     API: {
 
-        GOOGLE_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbw9czZazEola8dXP_yl9LpWBpYKQVyMvnMTNaex3zUiQgAf7kRCe-fImLgMMcjaxkMtyg/exec",
+        GOOGLE_SCRIPT_READ_URL: "https://script.google.com/macros/s/AKfycbw9czZazEola8dXP_yl9LpWBpYKQVyMvnMTNaex3zUiQgAf7kRCe-fImLgMMcjaxkMtyg/exec",
+
+        /*
+         * Commit 10 - authenticated write endpoint.
+         * Set this to the separate Apps Script web-app deployment
+         * configured for signed-in/authorized writes.
+         */
+        GOOGLE_SCRIPT_WRITE_URL: "https://script.google.com/macros/s/AKfycbwusxDemJO_-aP5AsxdvGT5T_ZioUVVKA15ATd0JQMoNTVQcDs6kGkyKRg6GPXKu0laEw/exec",
 
         REQUEST_TIMEOUT: 30000
 

@@ -11,12 +11,19 @@ import { replaceTariffConfigs } from "./tariff-engine.js";
 
 var STORAGE_KEY = "solarEnergyDashboard.readings";
 
-function getUrl() {
-    return CONFIG.API.GOOGLE_SCRIPT_URL || "";
+function getReadUrl() {
+    return CONFIG.API.GOOGLE_SCRIPT_READ_URL || "";
+}
+
+function getWriteUrl() {
+    return CONFIG.API.GOOGLE_SCRIPT_WRITE_URL || "";
 }
 
 function isConfigured() {
-    return getUrl().trim() !== "";
+    return (
+        getReadUrl().trim() !== "" &&
+        getWriteUrl().trim() !== ""
+    );
 }
 
 function getLocalReadings() {
@@ -154,14 +161,14 @@ function nextCallbackName() {
 function requestReadings(callback) {
     var script;
     var callbackName;
-    var url = getUrl();
+    var url = getReadUrl();
     var completed = false;
 
     if (!url) {
         callback({
             ok: false,
             configured: false,
-            error: "Google Sheets URL is not configured."
+            error: "Google Sheets read URL is not configured."
         });
         return;
     }
@@ -243,7 +250,7 @@ function requestReadings(callback) {
 function requestSyncReading(reading, callback) {
     var script;
     var callbackName;
-    var url = getUrl();
+    var url = getWriteUrl();
     var completed = false;
     var payload = JSON.stringify({
         action: "sync",
@@ -254,7 +261,7 @@ function requestSyncReading(reading, callback) {
         callback({
             ok: false,
             configured: false,
-            error: "Google Sheets URL is not configured."
+            error: "Google Sheets write URL is not configured."
         });
         return;
     }
@@ -444,7 +451,7 @@ function syncReadings(callback) {
             ok: false,
             configured: false,
             synced: false,
-            error: "Google Sheets URL is not configured."
+            error: "Google Sheets read/write URLs are not configured."
         });
         return;
     }
