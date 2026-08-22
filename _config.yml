@@ -1,0 +1,12 @@
+title: Solar Energy Dashboard
+description: Personal solar energy and electricity tracking dashboard
+
+url: "https://rohith-s.github.io"
+baseurl: "/solar-energy-dashboard"
+
+exclude:
+  - "*.zip"
+  - "*.log"
+  - "node_modules"
+  - ".git"
+  - ".github"

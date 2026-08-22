@@ -1,4 +1,4 @@
-# Reading Module — Commit 3
+# Reading Module
 
 ## Inputs
 
@@ -6,34 +6,23 @@
 2. Starting Solar Export — cumulative net-meter export reading.
 3. Current Grid Import — current cumulative import reading.
 4. Current Solar Export — current cumulative export reading.
-5. Inverter Generation — cumulative solar generation reading.
+5. Inverter Generation — direct solar generation value for the current period.
 
 ## Calculations
 
 ```text
-Grid Import = Current Grid Import - Starting Grid Import
-
-Solar Export = Current Solar Export - Starting Solar Export
-
-Net Grid Position = Solar Export - Grid Import
-
-Solar Used at Home = Inverter Generation - Solar Export
-
-Home Consumption = Inverter Generation + Grid Import - Solar Export
+Grid Import Units = Current Grid Import - Previous Month-End Grid Import
+Grid Export Units = Current Grid Export - Previous Month-End Grid Export
+Net Grid Position = Grid Export Units - Grid Import Units
+Home Consumption = Solar Generation + Grid Import Units - Grid Export Units
 ```
 
-Interpretation:
-
-- Net Grid Position > 0 → more energy supplied to the grid.
-- Net Grid Position < 0 → more energy consumed from the grid.
-- Net Grid Position = 0 → balanced.
+Solar Generation is stored as the direct value for the current month/period. It is not calculated as a cumulative difference.
 
 ## Month-end
 
-The checkbox saves the current cumulative meter values as a month-end reference in local storage.
+A month-end reading is saved as the baseline for subsequent cumulative Grid Import and Grid Export calculations. The previous baseline must be the latest saved month-end reading strictly before the selected reading date.
 
-The Google Sheets adapter will replace this local persistence later without changing the calculation engine.
+## Persistence
 
-## Important
-
-The current implementation intentionally uses localStorage only. It is a development fallback and is **not yet multi-device storage**. Google Sheets integration is the next persistence step.
+Local Storage remains the browser cache/fallback. Google Sheets synchronization is implemented separately and does not change the reading calculation rules.
