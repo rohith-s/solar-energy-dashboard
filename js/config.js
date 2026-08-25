@@ -28,7 +28,8 @@ export const CONFIG = Object.freeze({
          */
         GOOGLE_SCRIPT_WRITE_URL: "https://script.google.com/macros/s/AKfycbwusxDemJO_-aP5AsxdvGT5T_ZioUVVKA15ATd0JQMoNTVQcDs6kGkyKRg6GPXKu0laEw/exec",
 
-        REQUEST_TIMEOUT: 30000
+        REQUEST_TIMEOUT: 30000,
+        GOOGLE_CLIENT_ID: '717095377952-t0b96jckd54cp0ret2utt8r693dbi6kv.apps.googleusercontent.com'
 
     },
 

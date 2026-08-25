@@ -36,6 +36,8 @@
       </div>
       <div class="header-status">
         <span id="header-month" class="header-month"></span>
+        <span id="google-signin-container" aria-label="Google sign-in"></span>
+        <span id="google-auth-status" class="google-auth-status" hidden>Google signed in</span>
         <span class="status-indicator" title="Application is running">
           <span class="status-dot" aria-hidden="true"></span>
           Local
@@ -77,6 +79,46 @@
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
   <script type="module" src="js/app.js"></script>
   <script type="module" src="js/sheets-sync.js"></script>
+  <script type="module">
+    import {
+      renderGoogleSignInButton,
+      isGoogleSignedIn
+    } from "./js/sheets-api.js";
+
+    var googleSignInContainer =
+      document.getElementById("google-signin-container");
+
+    var googleAuthStatus =
+      document.getElementById("google-auth-status");
+
+    function updateGoogleAuthUi(signedIn) {
+      if (!googleSignInContainer || !googleAuthStatus) {
+        return;
+      }
+
+      if (signedIn) {
+        googleSignInContainer.hidden = true;
+        googleAuthStatus.hidden = false;
+        googleAuthStatus.textContent = "Google signed in";
+      } else {
+        googleSignInContainer.hidden = false;
+        googleAuthStatus.hidden = true;
+      }
+    }
+
+    if (googleSignInContainer) {
+      updateGoogleAuthUi(isGoogleSignedIn());
+
+      renderGoogleSignInButton(
+        googleSignInContainer,
+        function (result) {
+          if (result && result.ok) {
+            updateGoogleAuthUi(true);
+          }
+        }
+      );
+    }
+  </script>
 </body>
 
 </html>
