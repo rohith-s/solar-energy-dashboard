@@ -82,7 +82,9 @@
   <script type="module">
     import {
       renderGoogleSignInButton,
-      isGoogleSignedIn
+      isGoogleSignedIn,
+      getGoogleUserProfile,
+      syncReadings
     } from "./js/sheets-api.js";
 
     var googleSignInContainer =
@@ -91,29 +93,87 @@
     var googleAuthStatus =
       document.getElementById("google-auth-status");
 
+    var syncAfterGoogleSignInInProgress = false;
+
     function updateGoogleAuthUi(signedIn) {
+      var profile;
+      var label;
+
       if (!googleSignInContainer || !googleAuthStatus) {
         return;
       }
 
       if (signedIn) {
+        profile = getGoogleUserProfile();
+        label =
+          profile && profile.name
+            ? "Google signed in · " + profile.name
+            : "Google signed in";
+
         googleSignInContainer.hidden = true;
         googleAuthStatus.hidden = false;
-        googleAuthStatus.textContent = "Google signed in";
+        googleAuthStatus.textContent = label;
       } else {
         googleSignInContainer.hidden = false;
         googleAuthStatus.hidden = true;
       }
     }
 
+    function syncAfterGoogleSignIn() {
+      if (syncAfterGoogleSignInInProgress) {
+        return;
+      }
+
+      if (!isGoogleSignedIn()) {
+        return;
+      }
+
+      syncAfterGoogleSignInInProgress = true;
+
+      syncReadings(function (result) {
+        syncAfterGoogleSignInInProgress = false;
+
+        if (
+          result &&
+          result.ok &&
+          result.synced
+        ) {
+          window.dispatchEvent(
+            new CustomEvent(
+              "solar:google-sync-completed"
+            )
+          );
+        }
+      });
+    }
+
+    /*
+     * GIS can complete automatic account selection after this module has
+     * rendered. Listen for the authentication event so the UI and any
+     * pending synchronization are updated immediately.
+     */
+    window.addEventListener(
+      "solar:google-signin",
+      function () {
+        updateGoogleAuthUi(
+          isGoogleSignedIn()
+        );
+
+        syncAfterGoogleSignIn();
+      }
+    );
+
     if (googleSignInContainer) {
-      updateGoogleAuthUi(isGoogleSignedIn());
+      updateGoogleAuthUi(
+        isGoogleSignedIn()
+      );
 
       renderGoogleSignInButton(
         googleSignInContainer,
         function (result) {
           if (result && result.ok) {
             updateGoogleAuthUi(true);
+            syncAfterGoogleSignIn();
           }
         }
       );

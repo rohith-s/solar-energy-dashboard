@@ -315,6 +315,10 @@ function loadGoogleIdentityServices(
 var googleCredential = "";
 var googleCredentialExpiry = 0;
 var googleIdentityInitialized = false;
+var googleUserProfile = {
+    name: "",
+    email: ""
+};
 
 function getJwtExpiry(credential) {
     var parts;
@@ -350,7 +354,104 @@ function getJwtExpiry(credential) {
     }
 }
 
+function getJwtProfile(credential) {
+    var parts;
+    var payload;
+    var decoded;
+    var json;
+
+    if (!credential) {
+        return {
+            name: "",
+            email: ""
+        };
+    }
+
+    parts = String(credential).split(".");
+
+    if (parts.length < 2) {
+        return {
+            name: "",
+            email: ""
+        };
+    }
+
+    try {
+        payload = parts[1]
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+
+        while (payload.length % 4) {
+            payload += "=";
+        }
+
+        decoded = window.atob(payload);
+
+        /*
+         * Decode UTF-8 safely while remaining ES5-compatible.
+         */
+        decoded = decoded
+            .split("")
+            .map(function (character) {
+                return "%" +
+                    ("00" +
+                        character
+                            .charCodeAt(0)
+                            .toString(16)
+                    ).slice(-2);
+            })
+            .join("");
+
+        json = JSON.parse(
+            decodeURIComponent(decoded)
+        );
+
+        return {
+            name: String(json.name || "").trim(),
+            email: String(json.email || "").trim().toLowerCase()
+        };
+    } catch (error) {
+        return {
+            name: "",
+            email: ""
+        };
+    }
+}
+
+function dispatchGoogleSignInEvent() {
+    var event;
+
+    try {
+        if (typeof window.CustomEvent === "function") {
+            event =
+                new window.CustomEvent(
+                    "solar:google-signin"
+                );
+        } else {
+            event =
+                document.createEvent(
+                    "Event"
+                );
+
+            event.initEvent(
+                "solar:google-signin",
+                false,
+                false
+            );
+        }
+
+        window.dispatchEvent(event);
+    } catch (error) {
+        /*
+         * Authentication itself must not fail because the UI event
+         * could not be dispatched.
+         */
+    }
+}
+
 function cacheGoogleCredential(credential) {
+    var profile;
+
     googleCredential =
         String(credential || "").trim();
 
@@ -358,11 +459,35 @@ function cacheGoogleCredential(credential) {
         getJwtExpiry(
             googleCredential
         );
+
+    profile =
+        getJwtProfile(
+            googleCredential
+        );
+
+    googleUserProfile.name =
+        profile.name;
+
+    googleUserProfile.email =
+        profile.email;
+
+    if (googleCredential) {
+        dispatchGoogleSignInEvent();
+    }
 }
 
 function clearGoogleCredential() {
     googleCredential = "";
     googleCredentialExpiry = 0;
+    googleUserProfile.name = "";
+    googleUserProfile.email = "";
+}
+
+function getGoogleUserProfile() {
+    return {
+        name: googleUserProfile.name,
+        email: googleUserProfile.email
+    };
 }
 
 function isGoogleSignedIn() {
@@ -413,7 +538,7 @@ function initializeGoogleIdentity(callback) {
                     client_id:
                         clientId,
                     auto_select:
-                        false,
+                        true,
                     cancel_on_tap_outside:
                         false,
                     callback:
@@ -546,8 +671,9 @@ function renderGoogleSignInButton(
 /*
  * Obtain a Google Identity Services ID token.
  *
- * If the user has already signed in using the header button, reuse the
- * still-valid in-memory token. Otherwise show the Google sign-in prompt.
+ * If the user has already signed in using the header button or Google
+ * has silently selected the account, reuse the still-valid in-memory token.
+ * Otherwise show the Google sign-in prompt.
  */
 function getGoogleIdToken(callback) {
     var completed = false;
@@ -1353,5 +1479,6 @@ export {
     isConfigured,
     syncReadings,
     renderGoogleSignInButton,
-    isGoogleSignedIn
+    isGoogleSignedIn,
+    getGoogleUserProfile
 };

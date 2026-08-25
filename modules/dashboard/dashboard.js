@@ -11,6 +11,10 @@ import {
     calculateReading
 } from "../reading/reading.js";
 
+import {
+    getGoogleUserProfile
+} from "../../js/sheets-api.js";
+
 var selectedPeriod = "";
 var dashboardEventsBound = false;
 
@@ -161,6 +165,25 @@ function getLatestReadingForPeriod(
         })[0] || null;
 }
 
+function getDashboardGreeting() {
+    var profile =
+        getGoogleUserProfile();
+
+    var name =
+        profile &&
+        profile.name
+            ? String(profile.name).trim()
+            : "";
+
+    if (name) {
+        return "Good evening, " +
+            name +
+            " 👋";
+    }
+
+    return "Good evening 👋";
+}
+
 function getCalculation(reading) {
     if (!reading) {
         return null;
@@ -290,7 +313,7 @@ function renderEmptyState() {
                     '<p class="eyebrow">Energy overview</p>' +
                     '<h1 id="dashboard-title" ' +
                         'class="page-title">' +
-                        'Good evening 👋' +
+                        getDashboardGreeting() +
                     '</h1>' +
                     '<p class="page-description">' +
                         'Start tracking your solar generation, ' +
@@ -608,7 +631,7 @@ export function render() {
 
                     '<h1 id="dashboard-title" ' +
                         'class="page-title">' +
-                        'Good evening 👋' +
+                        getDashboardGreeting() +
                     '</h1>' +
 
                     '<p class="page-description">' +
@@ -878,6 +901,28 @@ function bindDashboardEvents() {
     }
 
     if (!dashboardEventsBound) {
+        window.addEventListener(
+            "solar:google-signin",
+            function () {
+                if (
+                    window.location.hash
+                        .indexOf("#/dashboard") === 0
+                ) {
+                    var appContent =
+                        document.getElementById(
+                            "app-content"
+                        );
+
+                    if (appContent) {
+                        appContent.innerHTML =
+                            render();
+
+                        bindDashboardEvents();
+                    }
+                }
+            }
+        );
+
         window.addEventListener(
             "solar:reading-saved",
             function () {
