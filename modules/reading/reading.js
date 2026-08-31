@@ -293,6 +293,10 @@ function calculateReading(
         gridImportUnits -
         gridExportUnits;
 
+    const netUnits =
+        gridExportUnits -
+        gridImportUnits;
+
     return {
         gridImportUnits,
         gridExportUnits,
@@ -300,7 +304,8 @@ function calculateReading(
         homeConsumption: Math.max(
             0,
             homeConsumption
-        )
+        ),
+        netUnits
     };
 }
 
@@ -923,7 +928,7 @@ function updatePreview() {
      * as the Previous Reading display and Save operation.
      */
     const previous =
-    getPreviousReading(readingDate);
+        getPreviousReading(readingDate);
 
     const calculation =
         calculateReading(
@@ -994,6 +999,25 @@ function updatePreview() {
             .gridExportUnits,
         2
     )} kWh
+                 </strong>
+
+            </div>
+
+            <div
+                class="preview-item preview-highlight"
+            >
+
+                <span>
+                    Net Units
+                </span>
+
+                <strong>
+                    ${formatNumber(
+        calculation
+            .netUnits,
+        2
+    )} kWh
+                </strong>
                 </strong>
 
             </div>
@@ -1098,9 +1122,9 @@ function handleSubmit(event) {
      * Never use getLatestReading() here.
      */
     const previous =
-    getPreviousReading(
-        values.readingDate
-    );
+        getPreviousReading(
+            values.readingDate
+        );
 
     const errors =
         validateReading(
@@ -1445,3 +1469,4 @@ export {
     init,
     render
 };
+
