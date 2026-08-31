@@ -76,45 +76,232 @@ var DEFAULT_TARIFF_MASTER = [
     ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false]
 ];
 var WRITE_ALLOWED_EMAIL_PROPERTY = "WRITE_ALLOWED_EMAIL";
+var GOOGLE_CLIENT_ID =
+    "717095377952-t0b96jckd54cp0ret2utt8r693dbi6kv.apps.googleusercontent.com";
 
-function requireAuthorizedWriter() {
-    var allowedEmails = String(
+function getActiveUserEmail() {
+    var user;
+
+    try {
+        user = Session.getActiveUser();
+
+        if (!user) {
+            return "";
+        }
+
+        return String(
+            user.getEmail() || ""
+        ).trim().toLowerCase();
+    } catch (error) {
+        throw new Error(
+            "Unable to determine the signed-in Google account. " +
+            "Please sign in and authorize the Solar Energy Dashboard."
+        );
+    }
+}
+
+function getAllowedWriterEmails() {
+    var configured = String(
         PropertiesService
             .getScriptProperties()
             .getProperty(WRITE_ALLOWED_EMAIL_PROPERTY) || ""
-    )
+    );
+
+    return configured
         .split(",")
         .map(function (email) {
-            return email.trim().toLowerCase();
+            return String(email)
+                .trim()
+                .toLowerCase();
         })
         .filter(function (email) {
             return email !== "";
         });
+}
 
-    var activeEmail = String(
-        Session.getActiveUser().getEmail() || ""
-    )
-        .trim()
-        .toLowerCase();
+function verifyGoogleIdToken(idToken) {
+    var response;
+    var statusCode;
+    var tokenInfo;
+    var issuer;
+    var audience;
+    var expiry;
+    var nowSeconds;
+    var email;
 
-    if (!allowedEmails.length) {
-        throw new Error(
-            "Write access is not configured. Set the WRITE_ALLOWED_EMAIL script property."
-        );
-    }
+    idToken =
+        String(
+            idToken || ""
+        ).trim();
 
-    if (!activeEmail) {
+    if (!idToken) {
         throw new Error(
             "Google sign-in is required for synchronization writes."
         );
     }
 
-    if (allowedEmails.indexOf(activeEmail) === -1) {
+    try {
+        response =
+            UrlFetchApp.fetch(
+                "https://oauth2.googleapis.com/tokeninfo?id_token=" +
+                encodeURIComponent(idToken),
+                {
+                    method: "get",
+                    muteHttpExceptions: true
+                }
+            );
+
+        statusCode =
+            response.getResponseCode();
+
+        if (statusCode !== 200) {
+            throw new Error(
+                "Google ID token validation failed."
+            );
+        }
+
+        tokenInfo =
+            JSON.parse(
+                response.getContentText()
+            );
+
+        /*
+         * 1. Validate the Google token issuer.
+         */
+        issuer =
+            String(
+                tokenInfo.iss || ""
+            );
+
+        if (
+            issuer !==
+                "https://accounts.google.com" &&
+            issuer !==
+                "accounts.google.com"
+        ) {
+            throw new Error(
+                "Invalid Google sign-in issuer."
+            );
+        }
+
+        /*
+         * 2. Validate the OAuth client ID.
+         *
+         * Google tokeninfo returns the audience
+         * in the "aud" property.
+         */
+        audience =
+            String(
+                tokenInfo.aud || ""
+            );
+
+        if (
+            audience !==
+            GOOGLE_CLIENT_ID
+        ) {
+            throw new Error(
+                "Google sign-in was issued for an unexpected application."
+            );
+        }
+
+        /*
+         * 3. Validate token expiry.
+         */
+        expiry =
+            Number(
+                tokenInfo.exp || 0
+            );
+
+        nowSeconds =
+            Math.floor(
+                new Date().getTime() / 1000
+            );
+
+        if (
+            !expiry ||
+            expiry <= nowSeconds
+        ) {
+            throw new Error(
+                "Google sign-in has expired. Please sign in again."
+            );
+        }
+
+        /*
+         * 4. Validate the Google account email.
+         *
+         * Google tokeninfo returns "email_verified".
+         */
+        if (
+            String(
+                tokenInfo.email_verified
+            ).toLowerCase() !==
+            "true"
+        ) {
+            throw new Error(
+                "The Google account email is not verified."
+            );
+        }
+
+        /*
+         * 5. Get the authenticated email.
+         */
+        email =
+            String(
+                tokenInfo.email || ""
+            )
+            .trim()
+            .toLowerCase();
+
+        if (!email) {
+            throw new Error(
+                "Unable to determine the Google account email."
+            );
+        }
+
+        /*
+         * Return the normalized email.
+         *
+         * requireAuthorizedWriter() compares this
+         * directly with WRITE_ALLOWED_EMAIL.
+         */
+        return email;
+
+    } catch (error) {
         throw new Error(
-            "You are not authorized to modify Solar Energy Dashboard data."
+            String(
+                error.message ||
+                "Unable to validate Google sign-in."
+            )
         );
     }
 }
+
+function requireAuthorizedWriter(idToken) {
+    var allowedEmails =
+        getAllowedWriterEmails();
+
+    var activeEmail;
+
+    if (!allowedEmails.length) {
+        throw new Error(
+            "Write access is not configured. " +
+            "Set the WRITE_ALLOWED_EMAIL script property."
+        );
+    }
+
+    activeEmail =
+        verifyGoogleIdToken(idToken);
+
+    if (
+        allowedEmails.indexOf(activeEmail) === -1
+    ) {
+        throw new Error(
+            "You are not authorized to modify " +
+            "Solar Energy Dashboard data."
+        );
+    }
+}
+
 
 function jsonResponse(payload, callbackName) {
     var body = JSON.stringify(payload);
@@ -640,10 +827,23 @@ function doGet(e) {
         }
 
         if (action === "sync") {
-            requireAuthorizedWriter();
+             var payload =
+                parsePayload(
+                    getParameter(
+                        e,
+                        "payload"
+                    )
+                );
 
-            var payload = parsePayload(
-                getParameter(e, "payload")
+            var credential =
+                String(
+                    payload.credential ||
+                    getParameter(e, "credential") ||
+                    ""
+                ).trim();
+
+            requireAuthorizedWriter(
+                credential
             );
 
             if (payload.action !== "sync") {
@@ -690,7 +890,13 @@ function doGet(e) {
 
 function doPost(e) {
     try {
-        requireAuthorizedWriter();
+        requireAuthorizedWriter(
+          e &&
+          e.parameter &&
+          e.parameter.id_token
+            ? String(e.parameter.id_token)
+            : ""
+        );
 
         var body =
             e &&
@@ -738,4 +944,22 @@ function doPost(e) {
             error: String(error.message || error)
         });
     }
+}
+
+function testAuthorization() {
+    return Session.getActiveUser().getEmail();
+}
+
+function getCurrentUserInfo() {
+  var email = Session.getActiveUser().getEmail();
+
+  return {
+    ok: true,
+    email: email || '',
+    message: email ? 'Active user email detected.' : 'Active user email is not available.'
+  };
+}
+
+function authorizeExternalRequest() {
+    UrlFetchApp.fetch("https://www.google.com");
 }
