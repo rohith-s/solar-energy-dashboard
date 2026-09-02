@@ -939,6 +939,36 @@ function updatePreview() {
             },
             previous
         );
+    console.group(
+        "[Reading Debug] Calculation"
+    );
+
+    console.log(
+        "Input Grid Import:",
+        gridImportValue
+    );
+
+    console.log(
+        "Input Grid Export:",
+        gridExportValue
+    );
+
+    console.log(
+        "Input Solar Generation:",
+        solarInverterValue
+    );
+
+    console.log(
+        "Calculation Result:",
+        calculation
+    );
+
+    console.log(
+        "Calculated Solar Generation:",
+        calculation.solarGenerationUnits
+    );
+
+    console.groupEnd();
 
     preview.innerHTML = `
         <div class="preview-header">
@@ -1018,7 +1048,6 @@ function updatePreview() {
         2
     )} kWh
                 </strong>
-                </strong>
 
             </div>
 
@@ -1044,6 +1073,30 @@ function updatePreview() {
     `;
 
     preview.hidden = false;
+}
+/* ------------------------------------------------------------
+   Input value capture
+   ------------------------------------------------------------ */
+
+/*
+ * Capture the value exactly as currently present in the input.
+ *
+ * IMPORTANT:
+ *
+ * These three fields represent user-entered readings:
+ *
+ * 1. Grid Import      -> cumulative meter reading
+ * 2. Grid Export      -> cumulative meter reading
+ * 3. Solar Generation -> direct monthly/period value
+ *
+ * Do not derive or recalculate the entered value here.
+ */
+function getEnteredReadingValue(element) {
+    if (!element) {
+        return "";
+    }
+
+    return element.value;
 }
 
 /* ------------------------------------------------------------
@@ -1102,17 +1155,60 @@ function handleSubmit(event) {
             readingDateElement.value,
 
         gridImport:
-            gridImportElement.value,
+            getEnteredReadingValue(
+                gridImportElement
+            ),
 
         gridExport:
-            gridExportElement.value,
+            getEnteredReadingValue(
+                gridExportElement
+            ),
 
         solarInverter:
-            solarInverterElement.value,
+            getEnteredReadingValue(
+                solarInverterElement
+            ),
 
         isMonthEnd:
             monthEndElement.checked
     };
+
+    console.group(
+        "[Reading Debug] User Input"
+    );
+
+    console.log(
+        "Reading Date:",
+        values.readingDate
+    );
+
+    console.log(
+        "Grid Import - raw:",
+        values.gridImport,
+        "type:",
+        typeof values.gridImport
+    );
+
+    console.log(
+        "Grid Export - raw:",
+        values.gridExport,
+        "type:",
+        typeof values.gridExport
+    );
+
+    console.log(
+        "Solar Generation - raw:",
+        values.solarInverter,
+        "type:",
+        typeof values.solarInverter
+    );
+
+    console.log(
+        "Month End:",
+        values.isMonthEnd
+    );
+
+    console.groupEnd();
 
     /*
      * IMPORTANT:
@@ -1158,16 +1254,93 @@ function handleSubmit(event) {
 
     errorContainer.hidden = true;
 
+    const enteredGridImport =
+        Number(values.gridImport);
+
+    const enteredGridExport =
+        Number(values.gridExport);
+
+    const enteredSolarGeneration =
+        Number(values.solarInverter);
+
+
+    console.group(
+        "[Reading Debug] Previous Reading"
+    );
+
+    console.log(
+        "Previous:",
+        previous
+    );
+
+    if (previous) {
+        console.log(
+            "Previous Grid Import:",
+            previous.gridImport
+        );
+
+        console.log(
+            "Previous Grid Export:",
+            previous.gridExport
+        );
+
+        console.log(
+            "Previous Solar Generation:",
+            previous.solarInverter
+        );
+
+        console.log(
+            "Previous Reading Date:",
+            previous.readingDate
+        );
+    }
+
+    console.groupEnd();
     /*
      * Calculate using exactly the same previous reading
      * that was selected for validation and display.
      */
     const calculation =
         calculateReading(
-            values,
+            {
+                gridImport:
+                    enteredGridImport,
+
+                gridExport:
+                    enteredGridExport,
+
+                solarInverter:
+                    enteredSolarGeneration
+            },
             previous
         );
 
+    console.group(
+        "[Reading Debug] Numeric Conversion"
+    );
+
+    console.log(
+        "Grid Import:",
+        values.gridImport,
+        "=>",
+        Number(values.gridImport)
+    );
+
+    console.log(
+        "Grid Export:",
+        values.gridExport,
+        "=>",
+        Number(values.gridExport)
+    );
+
+    console.log(
+        "Solar Generation:",
+        values.solarInverter,
+        "=>",
+        Number(values.solarInverter)
+    );
+
+    console.groupEnd();
     const reading = {
         id:
             "reading-" +
@@ -1181,13 +1354,13 @@ function handleSubmit(event) {
             values.readingDate,
 
         gridImport:
-            Number(values.gridImport),
+            enteredGridImport,
 
         gridExport:
-            Number(values.gridExport),
+            enteredGridExport,
 
         solarInverter:
-            Number(values.solarInverter),
+            enteredSolarGeneration,
 
         isMonthEnd:
             Boolean(values.isMonthEnd),
@@ -1219,21 +1392,104 @@ function handleSubmit(event) {
 
     readings.push(reading);
 
+    console.group(
+        "[Reading Debug] Final Record Before Save"
+    );
+
+    console.log(
+        "Final reading object:",
+        reading
+    );
+
+    console.log(
+        "Final Grid Import:",
+        reading.gridImport
+    );
+
+    console.log(
+        "Final Grid Export:",
+        reading.gridExport
+    );
+
+    console.log(
+        "Final Solar Generation:",
+        reading.solarInverter
+    );
+
+    console.log(
+        "Final Calculation:",
+        reading.calculation
+    );
+
+    console.groupEnd();
     if (!saveReadings(readings)) {
         errorContainer.innerHTML = `
-            <strong>
-                Unable to save reading.
-            </strong>
+        <strong>
+            Unable to save reading.
+        </strong>
 
-            <p>
-                Your browser storage may be unavailable.
-            </p>
-        `;
+        <p>
+            Your browser storage may be unavailable.
+        </p>
+    `;
 
         errorContainer.hidden = false;
 
         return;
     }
+
+    /*
+     * Verify exactly what was written to Local Storage.
+     *
+     * This helps identify whether a value changes
+     * during or after the save operation.
+     */
+    const savedReadings =
+        getReadings();
+
+    const savedReading =
+        savedReadings.find(function (item) {
+            return item.id === reading.id;
+        });
+
+    console.group(
+        "[Reading Debug] Post-Save Verification"
+    );
+
+    console.log(
+        "Saved reading:",
+        savedReading
+    );
+
+    console.log(
+        "Saved Grid Import:",
+        savedReading
+            ? savedReading.gridImport
+            : "NOT FOUND"
+    );
+
+    console.log(
+        "Saved Grid Export:",
+        savedReading
+            ? savedReading.gridExport
+            : "NOT FOUND"
+    );
+
+    console.log(
+        "Saved Solar Generation:",
+        savedReading
+            ? savedReading.solarInverter
+            : "NOT FOUND"
+    );
+
+    console.log(
+        "Saved Calculation:",
+        savedReading
+            ? savedReading.calculation
+            : "NOT FOUND"
+    );
+
+    console.groupEnd();
 
     /*
      * Notify the rest of the application that a new
