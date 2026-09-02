@@ -50,7 +50,9 @@ function renderSlabs(config) {
     return config.slabs.map(function (slab) {
         return '<tr><td>' + esc(
             slab.to === null ? slab.from + "+" : slab.from + "–" + slab.to
-        ) + '</td><td>₹' + Number(slab.rate).toFixed(2) + '</td><td>/ kWh</td></tr>';
+        ) + '</td><td>₹' + Number(slab.rate).toFixed(2) +
+        '</td><td>₹' + Number(slab.customerCharge || 0).toFixed(2) +
+        '</td></tr>';
     }).join("");
 }
 
@@ -82,8 +84,9 @@ export function render() {
         '<label><span>Supply</span><input name="supplyPhase" value="' + esc(config.supplyPhase) + '" readonly></label>' +
         '<label><span>Recorded MD / load (kW)</span><input name="recordedMdKw" type="number" min="0" step="0.01" value="' + esc(config.recordedMdKw) + '" readonly></label>' +
         '<label><span>Fixed charge (₹ / kW)</span><input name="fixedChargePerKw" type="number" min="0" step="0.01" value="' + esc(config.fixedChargePerKw) + '" readonly></label>' +
-        '<label><span>Customer charge (₹ / month)</span><input name="customerCharge" type="number" min="0" step="0.01" value="' + esc(config.customerCharge) + '" readonly></label>' +
+        '<label><span>Customer charge</span><input name="customerCharge" value="Slab based" readonly></label>' +
         '<label><span>Export settlement rate (₹ / kWh)</span><input name="exportSettlementRate" type="number" min="0" step="0.01" value="' + esc(config.exportSettlementRate) + '" readonly></label>' +
+        '<label><span>Electricity duty (₹ / unit)</span><input name="electricityDutyPerUnit" type="number" min="0" step="0.01" value="' + esc(config.electricityDutyPerUnit) + '" readonly></label>' +
         '<label><span>FPPCA</span><input value="Excluded" readonly></label>' +
         '</div>' +
         '<div class="settings-actions"><span id="settings-message" role="status">Source: Google Sheets · Tariff Master + Tariff Slabs</span></div>' +
@@ -94,13 +97,14 @@ export function render() {
         '<div class="settings-summary-value"><span>Effective period</span><strong>' + esc(todayConfig.effectiveFrom) + ' → ' + esc(todayConfig.effectiveTo) + '</strong></div>' +
         '<div class="settings-summary-value"><span>Recorded MD</span><strong>' + esc(Number(todayConfig.recordedMdKw).toFixed(2)) + ' kW</strong></div>' +
         '<div class="settings-summary-value"><span>Fixed charge</span><strong>' + money(todayConfig.recordedMdKw * todayConfig.fixedChargePerKw) + ' / month</strong></div>' +
-        '<div class="settings-summary-value"><span>Customer charge</span><strong>' + money(todayConfig.customerCharge) + ' / month</strong></div>' +
+        '<div class="settings-summary-value"><span>Customer charge</span><strong>Slab based</strong></div>' +
+        '<div class="settings-summary-value"><span>Electricity duty</span><strong>₹' + Number(todayConfig.electricityDutyPerUnit || 0).toFixed(2) + ' / unit</strong></div>' +
         '<div class="settings-summary-value"><span>Export settlement</span><strong>' + money(todayConfig.exportSettlementRate) + ' / kWh</strong></div>' +
         '</aside>' +
         '<section class="card settings-card tariff-table-card">' +
         '<div class="section-heading"><div><h2>LT-I Domestic energy tariff · FY ' + esc(config.tariffYear) + '</h2><p>Telescopic energy charges used when Net Energy Position is negative for this tariff period.</p></div></div>' +
-        '<div class="table-scroll"><table class="settings-table"><thead><tr><th>Units</th><th>Rate</th><th>Unit</th></tr></thead><tbody>' + renderSlabs(config) + '</tbody></table></div>' +
-        '<p class="settings-note">Bill estimate = telescopic energy charge + fixed charge + customer charge. FPPCA is intentionally excluded. Consumer-specific arrears, adjustments, subsidies and other bill-only items are not estimated. To add a future tariff, add a new row to <strong>Tariff Master</strong> and its slab rows to <strong>Tariff Slabs</strong> in Google Sheets, then refresh/sync the application. Existing tariff versions remain preserved.</p>' +
+        '<div class="table-scroll"><table class="settings-table"><thead><tr><th>Units</th><th>Rate</th><th>Customer Charge</th></tr></thead><tbody>' + renderSlabs(config) + '</tbody></table></div>' +
+        '<p class="settings-note">Bill estimate = telescopic energy charge + fixed charge + slab-based customer charge + electricity duty. Electricity duty is applied only to positive tariff/billed units; export settlement revenue does not include customer charge, fixed charge or electricity duty. FPPCA is intentionally excluded. Consumer-specific arrears, adjustments, subsidies and other bill-only items are not estimated. To add a future tariff, add a new row to <strong>Tariff Master</strong> and its slab rows to <strong>Tariff Slabs</strong> in Google Sheets, then refresh/sync the application. Existing tariff versions remain preserved.</p>' +
         '</section>' +
         '</div>' +
         '</section>';

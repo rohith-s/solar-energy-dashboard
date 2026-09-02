@@ -23,9 +23,10 @@ Add two tabs in the same Google Spreadsheet:
 | Supply Phase | `Single Phase` |
 | Recorded MD (kW) | Example: `4` |
 | Fixed Charge (₹/kW) | Example: `10` |
-| Customer Charge (₹/month) | Example: `30` |
+| Customer Charge (₹/month) | Legacy field retained for compatibility; **not used for billing**. Customer charge is now read from Tariff Slabs. |
 | Export Settlement Rate (₹/kWh) | Example: `2.09` |
 | FPPCA Included | Keep `FALSE`; the application excludes FPPCA |
+| Electricity Duty (₹/unit) | Example: `0.06`; applied only to positive billed/tariff units |
 
 One row represents one tariff financial year.
 
@@ -37,6 +38,7 @@ One row represents one tariff financial year.
 | From Unit | Slab starting unit |
 | To Unit | Slab ending unit; blank for the final open-ended slab |
 | Rate (₹/kWh) | Energy charge rate |
+| Customer Charge (₹/month) | Customer charge selected from the slab applicable to the total positive tariff/billed units |
 
 One row represents one tariff slab.
 
@@ -59,7 +61,7 @@ The Apps Script creates and seeds these two tariff versions when the new tabs ar
 - FY 2025-26 — 01-Apr-2025 to 31-Mar-2026
 - FY 2026-27 — 01-Apr-2026 to 31-Mar-2027
 
-Both initially use the currently configured tariff values.
+Both initially use the configured LT-I Domestic slab values, slab-based customer charges, export settlement rate `2.09`, and electricity duty `0.06` per positive billed unit.
 
 ## Adding FY 2027-28
 
@@ -117,3 +119,16 @@ After deployment:
 8. Select `2027-28` and confirm its effective dates and rates.
 9. Confirm historical 2025-26 / 2026-27 analytics still use their own effective-period tariff.
 10. Confirm FPPCA remains excluded.
+
+
+## Customer charge and electricity duty calculation
+
+For a negative Net Energy Position, the application calculates the absolute net units as tariff/billed units and then:
+
+- Energy charge = telescopic slab calculation.
+- Customer charge = the customer charge from the slab containing the total tariff units.
+- Fixed charge = Recorded MD × Fixed Charge (₹/kW).
+- Electricity duty = tariff units × Electricity Duty (₹/unit), only when tariff units are greater than zero.
+- Estimated tariff = Energy charge + Customer charge + Fixed charge + Electricity duty.
+
+For a positive Net Energy Position, the application shows export settlement revenue only. Customer charge, fixed charge and electricity duty are not deducted from export revenue.

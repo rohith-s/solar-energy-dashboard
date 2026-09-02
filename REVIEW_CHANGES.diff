@@ -1,0 +1,679 @@
+--- a/js/tariff-engine.js
++++ b/js/tariff-engine.js
+@@ -11,12 +11,12 @@
+ var VERSIONS_STORAGE_KEY = "solarEnergyDashboard.tariffConfigs";
+ 
+ var BASE_SLABS = [
+-    { from: 0, to: 30, rate: 1.90 },
+-    { from: 31, to: 75, rate: 3.00 },
+-    { from: 76, to: 125, rate: 4.50 },
+-    { from: 126, to: 225, rate: 6.00 },
+-    { from: 226, to: 400, rate: 8.75 },
+-    { from: 401, to: null, rate: 9.75 }
++    { from: 0, to: 30, rate: 1.90, customerCharge: 25 },
++    { from: 31, to: 75, rate: 3.00, customerCharge: 30 },
++    { from: 76, to: 125, rate: 4.50, customerCharge: 45 },
++    { from: 126, to: 225, rate: 6.00, customerCharge: 50 },
++    { from: 226, to: 400, rate: 8.75, customerCharge: 55 },
++    { from: 401, to: null, rate: 9.75, customerCharge: 55 }
+ ];
+ 
+ function clone(value) {
+@@ -50,7 +50,12 @@
+     supplyPhase: "Single Phase",
+     recordedMdKw: 4,
+     fixedChargePerKw: 10,
++    /*
++     * Customer charge is now slab based. The legacy master-level
++     * customerCharge property is retained only for cache compatibility.
++     */
+     customerCharge: 30,
++    electricityDutyPerUnit: 0.06,
+     exportSettlementRate: Number(CONFIG.ENERGY.EXPORT_RATE) || 2.09,
+     includeFppca: false,
+     slabs: clone(BASE_SLABS)
+@@ -71,18 +76,54 @@
+     return number;
+ }
+ 
++function getBaseCustomerCharge(fromUnit, toUnit) {
++    var index;
++    var slab;
++
++    for (index = 0; index < BASE_SLABS.length; index += 1) {
++        slab = BASE_SLABS[index];
++
++        if (
++            Number(slab.from) === Number(fromUnit) &&
++            (
++                slab.to === null && (toUnit === null || toUnit === "") ||
++                slab.to !== null && Number(slab.to) === Number(toUnit)
++            )
++        ) {
++            return Number(slab.customerCharge) || 0;
++        }
++    }
++
++    return 0;
++}
++
+ function normalizeSlabs(value) {
+     var source = Array.isArray(value) && value.length
+         ? value
+         : BASE_SLABS;
+ 
+     return source.map(function (slab) {
++        var configuredCustomerCharge =
++            slab.customerCharge === null ||
++            slab.customerCharge === undefined ||
++            slab.customerCharge === ""
++                ? getBaseCustomerCharge(
++                    slab.from,
++                    slab.to
++                )
++                : slab.customerCharge;
++
+         return {
+             from: normalizeNumber(slab.from, 0, 0),
+             to: slab.to === null || slab.to === ""
+                 ? null
+                 : normalizeNumber(slab.to, null, 0),
+-            rate: normalizeNumber(slab.rate, 0, 0)
++            rate: normalizeNumber(slab.rate, 0, 0),
++            customerCharge: normalizeNumber(
++                configuredCustomerCharge,
++                0,
++                0
++            )
+         };
+     });
+ }
+@@ -123,9 +164,19 @@
+         config.fixedChargePerKw,
+         0
+     );
++    /*
++     * Legacy master-level customer charge is retained only as a
++     * fallback for older cached configurations. New calculations
++     * select customer charge from the applicable tariff slab.
++     */
+     config.customerCharge = normalizeNumber(
+         source.customerCharge,
+         config.customerCharge,
++        0
++    );
++    config.electricityDutyPerUnit = normalizeNumber(
++        source.electricityDutyPerUnit,
++        config.electricityDutyPerUnit,
+         0
+     );
+     config.exportSettlementRate = normalizeNumber(
+@@ -387,15 +438,72 @@
+     return true;
+ }
+ 
++export function getCustomerChargeForUsage(usage, configValue) {
++    var config = normalizeConfig(configValue || getTariffConfig());
++    var units = Math.max(0, Number(usage) || 0);
++    var applicableCharge = 0;
++    var index;
++    var slab;
++    var applies;
++
++    if (units <= 0) {
++        return 0;
++    }
++
++    for (index = 0; index < config.slabs.length; index += 1) {
++        slab = config.slabs[index];
++
++        applies =
++            units >= Number(slab.from || 0) &&
++            (
++                slab.to === null ||
++                units <= Number(slab.to)
++            );
++
++        if (applies) {
++            applicableCharge =
++                Number(slab.customerCharge) || 0;
++            break;
++        }
++
++        /*
++         * For fractional usage that crosses a slab boundary, the
++         * last slab used by the progressive calculation is the
++         * applicable customer-charge slab.
++         */
++        if (
++            slab.to !== null &&
++            units > Number(slab.to)
++        ) {
++            applicableCharge =
++                Number(slab.customerCharge) || 0;
++        }
++    }
++
++    /*
++     * Legacy cached tariff configurations may not contain slab
++     * customer charges. The standard slab values are restored by
++     * normalizeSlabs(), so no master-level customer charge is used
++     * as a billing fallback. This prevents a single monthly value
++     * from overriding the slab-based rule.
++     */
++    return applicableCharge;
++}
++
+ export function calculateDomesticTelescopicBill(usage, configValue) {
+     var config = normalizeConfig(configValue || getTariffConfig());
+-    var remaining = Math.max(0, Number(usage) || 0);
++    var totalUnits = Math.max(0, Number(usage) || 0);
++    var remaining = totalUnits;
+     var energyCharge = 0;
+     var breakdown = [];
+     var index;
+     var slab;
+     var units;
+     var slabWidth;
++    var fixedCharge;
++    var customerCharge;
++    var electricityDuty;
++    var total;
+ 
+     for (index = 0; index < config.slabs.length; index += 1) {
+         slab = config.slabs[index];
+@@ -420,22 +528,46 @@
+                     : slab.from + "-" + slab.to,
+                 units: units,
+                 rate: Number(slab.rate),
+-                charge: units * Number(slab.rate)
++                charge: units * Number(slab.rate),
++                customerCharge:
++                    Number(slab.customerCharge) || 0
+             });
+             remaining -= units;
+         }
+     }
+ 
+-    var fixedCharge =
++    fixedCharge =
+         config.recordedMdKw * config.fixedChargePerKw;
+-    var customerCharge = config.customerCharge;
+-    var total = energyCharge + fixedCharge + customerCharge;
++
++    customerCharge =
++        getCustomerChargeForUsage(
++            totalUnits,
++            config
++        );
++
++    /*
++     * Electricity Duty applies only to positive tariff/billed
++     * units. Export settlement does not attract this charge.
++     */
++    electricityDuty =
++        totalUnits > 0
++            ? totalUnits * Number(config.electricityDutyPerUnit || 0)
++            : 0;
++
++    total =
++        energyCharge +
++        fixedCharge +
++        customerCharge +
++        electricityDuty;
+ 
+     return {
+-        units: Math.max(0, Number(usage) || 0),
++        units: totalUnits,
+         energyCharge: energyCharge,
+         fixedCharge: fixedCharge,
+         customerCharge: customerCharge,
++        electricityDuty: electricityDuty,
++        electricityDutyRate:
++            Number(config.electricityDutyPerUnit || 0),
+         total: total,
+         breakdown: breakdown,
+         fppca: 0,
+--- a/modules/analytics/analytics.js
++++ b/modules/analytics/analytics.js
+@@ -343,7 +343,9 @@
+             '<span>Fixed charge</span><strong>' +
+             esc(money(s.bill.fixedCharge)) + '</strong>' +
+             '<span>Customer charge</span><strong>' +
+-            esc(money(s.bill.customerCharge)) + '</strong></div>' +
++            esc(money(s.bill.customerCharge)) + '</strong>' +
++            '<span>Electricity duty</span><strong>' +
++            esc(money(s.bill.electricityDuty)) + '</strong></div>' +
+             '<p class="disclaimer">Indicative estimate only; excludes consumer-specific adjustments, arrears, subsidies, taxes and other bill charges.</p>' +
+             '</section>';
+     }
+@@ -380,8 +382,8 @@
+ function netPositionSummary(rs) {
+     var positive = 0;
+     var negative = 0;
+-    var positiveTariff = 0;
+-    var negativeRevenue = 0;
++    var positiveRevenue = 0;
++    var negativeTariff = 0;
+ 
+     rs.forEach(function (r) {
+         var net = Number(r.exp || 0) - Number(r.imp || 0);
+@@ -389,10 +391,10 @@
+ 
+         if (net > 0) {
+             positive += net;
+-            positiveTariff += Number(s.settlementValue || 0);
++            positiveRevenue += Number(s.settlementValue || 0);
+         } else if (net < 0) {
+             negative += net;
+-            negativeRevenue += Number(
++            negativeTariff += Number(
+                 s.bill && s.bill.total
+                     ? s.bill.total
+                     : 0
+@@ -408,15 +410,15 @@
+         '<div class="net-position-values">' +
+         '<div class="net-position-value positive">' +
+         '<span>Positive Net</span>' +
+-        '<strong>+' + num(positive, 2) + ' kWh <em>/ ' + esc(money(positiveTariff)) + '</em></strong>' +
++        '<strong>+' + num(positive, 2) + ' kWh <em>/ ' + esc(money(positiveRevenue)) + '</em></strong>' +
+         '<small>Sum of positive monthly net positions · Revenue ' +
+-        esc(money(positiveTariff)) + '</small>' +
++        esc(money(positiveRevenue)) + '</small>' +
+         '</div>' +
+         '<div class="net-position-value negative">' +
+         '<span>Negative Net</span>' +
+-        '<strong>' + num(negative, 2) + ' kWh <em>/ ' + esc(money(negativeRevenue)) + '</em></strong>' +
++        '<strong>' + num(negative, 2) + ' kWh <em>/ ' + esc(money(negativeTariff)) + '</em></strong>' +
+         '<small>Sum of negative monthly net positions · Tariff ' +
+-        esc(money(negativeRevenue)) + '</small>' +
++        esc(money(negativeTariff)) + '</small>' +
+         '</div>' +
+         '</div>' +
+         '</section>';
+@@ -425,7 +427,7 @@
+ function table(rs) {
+     return '<section class="card analytics-table-card">' +
+         '<div class="section-heading"><div><h2>Monthly summary</h2>' +
+-        '<p>Uses the established Reading calculations and the tariff effective for each period.</p></div></div>' +
++        '<p>Negative net positions show the full estimated tariff including slab energy charges, fixed charge, slab-based customer charge and electricity duty. Positive net positions show settlement revenue only.</p></div></div>' +
+         '<div class="table-scroll"><table class="analytics-table"><thead><tr>' +
+         '<th>Period</th><th>Solar</th><th>Import</th><th>Export</th><th>Home</th><th>Net</th><th>Tariff / Revenue</th>' +
+         '</tr></thead><tbody>' +
+--- a/modules/settings/settings.js
++++ b/modules/settings/settings.js
+@@ -50,7 +50,9 @@
+     return config.slabs.map(function (slab) {
+         return '<tr><td>' + esc(
+             slab.to === null ? slab.from + "+" : slab.from + "–" + slab.to
+-        ) + '</td><td>₹' + Number(slab.rate).toFixed(2) + '</td><td>/ kWh</td></tr>';
++        ) + '</td><td>₹' + Number(slab.rate).toFixed(2) +
++        '</td><td>₹' + Number(slab.customerCharge || 0).toFixed(2) +
++        '</td></tr>';
+     }).join("");
+ }
+ 
+@@ -82,8 +84,9 @@
+         '<label><span>Supply</span><input name="supplyPhase" value="' + esc(config.supplyPhase) + '" readonly></label>' +
+         '<label><span>Recorded MD / load (kW)</span><input name="recordedMdKw" type="number" min="0" step="0.01" value="' + esc(config.recordedMdKw) + '" readonly></label>' +
+         '<label><span>Fixed charge (₹ / kW)</span><input name="fixedChargePerKw" type="number" min="0" step="0.01" value="' + esc(config.fixedChargePerKw) + '" readonly></label>' +
+-        '<label><span>Customer charge (₹ / month)</span><input name="customerCharge" type="number" min="0" step="0.01" value="' + esc(config.customerCharge) + '" readonly></label>' +
++        '<label><span>Customer charge</span><input name="customerCharge" value="Slab based" readonly></label>' +
+         '<label><span>Export settlement rate (₹ / kWh)</span><input name="exportSettlementRate" type="number" min="0" step="0.01" value="' + esc(config.exportSettlementRate) + '" readonly></label>' +
++        '<label><span>Electricity duty (₹ / unit)</span><input name="electricityDutyPerUnit" type="number" min="0" step="0.01" value="' + esc(config.electricityDutyPerUnit) + '" readonly></label>' +
+         '<label><span>FPPCA</span><input value="Excluded" readonly></label>' +
+         '</div>' +
+         '<div class="settings-actions"><span id="settings-message" role="status">Source: Google Sheets · Tariff Master + Tariff Slabs</span></div>' +
+@@ -94,13 +97,14 @@
+         '<div class="settings-summary-value"><span>Effective period</span><strong>' + esc(todayConfig.effectiveFrom) + ' → ' + esc(todayConfig.effectiveTo) + '</strong></div>' +
+         '<div class="settings-summary-value"><span>Recorded MD</span><strong>' + esc(Number(todayConfig.recordedMdKw).toFixed(2)) + ' kW</strong></div>' +
+         '<div class="settings-summary-value"><span>Fixed charge</span><strong>' + money(todayConfig.recordedMdKw * todayConfig.fixedChargePerKw) + ' / month</strong></div>' +
+-        '<div class="settings-summary-value"><span>Customer charge</span><strong>' + money(todayConfig.customerCharge) + ' / month</strong></div>' +
++        '<div class="settings-summary-value"><span>Customer charge</span><strong>Slab based</strong></div>' +
++        '<div class="settings-summary-value"><span>Electricity duty</span><strong>₹' + Number(todayConfig.electricityDutyPerUnit || 0).toFixed(2) + ' / unit</strong></div>' +
+         '<div class="settings-summary-value"><span>Export settlement</span><strong>' + money(todayConfig.exportSettlementRate) + ' / kWh</strong></div>' +
+         '</aside>' +
+         '<section class="card settings-card tariff-table-card">' +
+         '<div class="section-heading"><div><h2>LT-I Domestic energy tariff · FY ' + esc(config.tariffYear) + '</h2><p>Telescopic energy charges used when Net Energy Position is negative for this tariff period.</p></div></div>' +
+-        '<div class="table-scroll"><table class="settings-table"><thead><tr><th>Units</th><th>Rate</th><th>Unit</th></tr></thead><tbody>' + renderSlabs(config) + '</tbody></table></div>' +
+-        '<p class="settings-note">Bill estimate = telescopic energy charge + fixed charge + customer charge. FPPCA is intentionally excluded. Consumer-specific arrears, adjustments, subsidies and other bill-only items are not estimated. To add a future tariff, add a new row to <strong>Tariff Master</strong> and its slab rows to <strong>Tariff Slabs</strong> in Google Sheets, then refresh/sync the application. Existing tariff versions remain preserved.</p>' +
++        '<div class="table-scroll"><table class="settings-table"><thead><tr><th>Units</th><th>Rate</th><th>Customer Charge</th></tr></thead><tbody>' + renderSlabs(config) + '</tbody></table></div>' +
++        '<p class="settings-note">Bill estimate = telescopic energy charge + fixed charge + slab-based customer charge + electricity duty. Electricity duty is applied only to positive tariff/billed units; export settlement revenue does not include customer charge, fixed charge or electricity duty. FPPCA is intentionally excluded. Consumer-specific arrears, adjustments, subsidies and other bill-only items are not estimated. To add a future tariff, add a new row to <strong>Tariff Master</strong> and its slab rows to <strong>Tariff Slabs</strong> in Google Sheets, then refresh/sync the application. Existing tariff versions remain preserved.</p>' +
+         '</section>' +
+         '</div>' +
+         '</section>';
+--- a/google-apps-script/Code.gs
++++ b/google-apps-script/Code.gs
+@@ -50,30 +50,34 @@
+     "Supply Phase",
+     "Recorded MD (kW)",
+     "Fixed Charge (₹/kW)",
+-    "Customer Charge (₹/month)",
++    "Customer Charge (legacy - ignored)",
+     "Export Settlement Rate (₹/kWh)",
+-    "FPPCA Included"
++    "FPPCA Included",
++    "Electricity Duty (₹/unit)"
+ ];
+ 
+ var TARIFF_SLAB_HEADERS = [
+     "Tariff Year",
+     "From Unit",
+     "To Unit",
+-    "Rate (₹/kWh)"
++    "Rate (₹/kWh)",
++    "Customer Charge (₹/month)"
+ ];
+ 
+ var DEFAULT_TARIFF_SLABS = [
+-    [0, 30, 1.90],
+-    [31, 75, 3.00],
+-    [76, 125, 4.50],
+-    [126, 225, 6.00],
+-    [226, 400, 8.75],
+-    [401, "", 9.75]
++    [0, 30, 1.90, 25],
++    [31, 75, 3.00, 30],
++    [76, 125, 4.50, 45],
++    [126, 225, 6.00, 50],
++    [226, 400, 8.75, 55],
++    [401, "", 9.75, 55]
+ ];
+ 
++var DEFAULT_ELECTRICITY_DUTY = 0.06;
++
+ var DEFAULT_TARIFF_MASTER = [
+-    ["2025-26", "2025-04-01", "2026-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false],
+-    ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false]
++    ["2025-26", "2025-04-01", "2026-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false, DEFAULT_ELECTRICITY_DUTY],
++    ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false, DEFAULT_ELECTRICITY_DUTY]
+ ];
+ var WRITE_ALLOWED_EMAIL_PROPERTY = "WRITE_ALLOWED_EMAIL";
+ var GOOGLE_CLIENT_ID =
+@@ -460,6 +464,56 @@
+     }
+ }
+ 
++function migrateTariffMasterElectricityDuty(sheet) {
++    var lastRow = sheet.getLastRow();
++    var values;
++    var updates = [];
++    var index;
++    var year;
++    var duty;
++
++    if (lastRow < 2) {
++        return;
++    }
++
++    values = sheet.getRange(
++        2,
++        1,
++        lastRow - 1,
++        TARIFF_MASTER_HEADERS.length
++    ).getValues();
++
++    for (index = 0; index < values.length; index += 1) {
++        year = String(values[index][0] || "").trim();
++
++        if (
++            (
++                year === "2025-26" ||
++                year === "2026-27"
++            ) &&
++            (
++                values[index][10] === "" ||
++                values[index][10] === null
++            )
++        ) {
++            duty = DEFAULT_ELECTRICITY_DUTY;
++        } else {
++            duty = values[index][10];
++        }
++
++        updates.push([
++            duty
++        ]);
++    }
++
++    sheet.getRange(
++        2,
++        11,
++        updates.length,
++        1
++    ).setValues(updates);
++}
++
+ function getTariffMasterSheet() {
+     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+     var sheet;
+@@ -485,9 +539,92 @@
+             DEFAULT_TARIFF_MASTER.length,
+             TARIFF_MASTER_HEADERS.length
+         ).setValues(DEFAULT_TARIFF_MASTER);
++    } else {
++        /*
++         * Existing P2 sheets had no Electricity Duty column.
++         * Populate the configured default only for the standard
++         * 2025-26 / 2026-27 rows when the new field is blank.
++         */
++        migrateTariffMasterElectricityDuty(sheet);
+     }
+ 
+     return sheet;
++}
++
++function getDefaultCustomerCharge(fromUnit, toUnit) {
++    var index;
++    var slab;
++
++    for (index = 0; index < DEFAULT_TARIFF_SLABS.length; index += 1) {
++        slab = DEFAULT_TARIFF_SLABS[index];
++
++        if (
++            Number(slab[0]) === Number(fromUnit) &&
++            (
++                slab[1] === "" && (toUnit === "" || toUnit === null) ||
++                slab[1] !== "" && Number(slab[1]) === Number(toUnit)
++            )
++        ) {
++            return Number(slab[3] || 0);
++        }
++    }
++
++    return 0;
++}
++
++function migrateTariffSlabCustomerCharges(sheet) {
++    var lastRow = sheet.getLastRow();
++    var values;
++    var updates = [];
++    var index;
++    var year;
++    var charge;
++
++    if (lastRow < 2) {
++        return;
++    }
++
++    values = sheet.getRange(
++        2,
++        1,
++        lastRow - 1,
++        TARIFF_SLAB_HEADERS.length
++    ).getValues();
++
++    for (index = 0; index < values.length; index += 1) {
++        year = String(values[index][0] || "").trim();
++
++        if (
++            (
++                year === "2025-26" ||
++                year === "2026-27"
++            ) &&
++            (
++                values[index][4] === "" ||
++                values[index][4] === null
++            )
++        ) {
++            charge = getDefaultCustomerCharge(
++                values[index][1],
++                values[index][2]
++            );
++
++            updates.push([
++                charge
++            ]);
++        } else {
++            updates.push([
++                values[index][4]
++            ]);
++        }
++    }
++
++    sheet.getRange(
++        2,
++        5,
++        updates.length,
++        1
++    ).setValues(updates);
+ }
+ 
+ function getTariffSlabsSheet() {
+@@ -518,7 +655,8 @@
+                     DEFAULT_TARIFF_MASTER[tariffIndex][0],
+                     DEFAULT_TARIFF_SLABS[slabIndex][0],
+                     DEFAULT_TARIFF_SLABS[slabIndex][1],
+-                    DEFAULT_TARIFF_SLABS[slabIndex][2]
++                    DEFAULT_TARIFF_SLABS[slabIndex][2],
++                    DEFAULT_TARIFF_SLABS[slabIndex][3]
+                 ]);
+             }
+         }
+@@ -529,6 +667,13 @@
+             rows.length,
+             TARIFF_SLAB_HEADERS.length
+         ).setValues(rows);
++    } else {
++        /*
++         * Existing P2 sheets had no slab-level customer-charge column.
++         * Populate the standard 2025-26 / 2026-27 values only where
++         * the new column is blank. User-entered values are preserved.
++         */
++        migrateTariffSlabCustomerCharges(sheet);
+     }
+ 
+     return sheet;
+@@ -599,7 +744,8 @@
+             to: slabRows[index][2] === "" || slabRows[index][2] === null
+                 ? null
+                 : Number(slabRows[index][2]),
+-            rate: Number(slabRows[index][3] || 0)
++            rate: Number(slabRows[index][3] || 0),
++            customerCharge: Number(slabRows[index][4] || 0)
+         };
+ 
+         slabsByYear[year].push(slab);
+@@ -620,9 +766,15 @@
+             supplyPhase: String(masters[index][4] || ""),
+             recordedMdKw: Number(masters[index][5] || 0),
+             fixedChargePerKw: Number(masters[index][6] || 0),
++            /*
++             * customerCharge is retained for compatibility with older
++             * cached configurations. New billing uses the slab-level
++             * Customer Charge from Tariff Slabs.
++             */
+             customerCharge: Number(masters[index][7] || 0),
+             exportSettlementRate: Number(masters[index][8] || 0),
+             includeFppca: false,
++            electricityDutyPerUnit: Number(masters[index][10] || 0),
+             slabs: slabsByYear[year] || []
+         });
+     }
+--- a/docs/P2_GOOGLE_SHEETS_TARIFF_MASTER.md
++++ b/docs/P2_GOOGLE_SHEETS_TARIFF_MASTER.md
+@@ -23,9 +23,10 @@
+ | Supply Phase | `Single Phase` |
+ | Recorded MD (kW) | Example: `4` |
+ | Fixed Charge (₹/kW) | Example: `10` |
+-| Customer Charge (₹/month) | Example: `30` |
++| Customer Charge (₹/month) | Legacy field retained for compatibility; **not used for billing**. Customer charge is now read from Tariff Slabs. |
+ | Export Settlement Rate (₹/kWh) | Example: `2.09` |
+ | FPPCA Included | Keep `FALSE`; the application excludes FPPCA |
++| Electricity Duty (₹/unit) | Example: `0.06`; applied only to positive billed/tariff units |
+ 
+ One row represents one tariff financial year.
+ 
+@@ -37,6 +38,7 @@
+ | From Unit | Slab starting unit |
+ | To Unit | Slab ending unit; blank for the final open-ended slab |
+ | Rate (₹/kWh) | Energy charge rate |
++| Customer Charge (₹/month) | Customer charge selected from the slab applicable to the total positive tariff/billed units |
+ 
+ One row represents one tariff slab.
+ 
+@@ -59,7 +61,7 @@
+ - FY 2025-26 — 01-Apr-2025 to 31-Mar-2026
+ - FY 2026-27 — 01-Apr-2026 to 31-Mar-2027
+ 
+-Both initially use the currently configured tariff values.
++Both initially use the configured LT-I Domestic slab values, slab-based customer charges, export settlement rate `2.09`, and electricity duty `0.06` per positive billed unit.
+ 
+ ## Adding FY 2027-28
+ 
+@@ -117,3 +119,16 @@
+ 8. Select `2027-28` and confirm its effective dates and rates.
+ 9. Confirm historical 2025-26 / 2026-27 analytics still use their own effective-period tariff.
+ 10. Confirm FPPCA remains excluded.
++
++
++## Customer charge and electricity duty calculation
++
++For a negative Net Energy Position, the application calculates the absolute net units as tariff/billed units and then:
++
++- Energy charge = telescopic slab calculation.
++- Customer charge = the customer charge from the slab containing the total tariff units.
++- Fixed charge = Recorded MD × Fixed Charge (₹/kW).
++- Electricity duty = tariff units × Electricity Duty (₹/unit), only when tariff units are greater than zero.
++- Estimated tariff = Energy charge + Customer charge + Fixed charge + Electricity duty.
++
++For a positive Net Energy Position, the application shows export settlement revenue only. Customer charge, fixed charge and electricity duty are not deducted from export revenue.
+--- a/docs/COMMIT_09_SETTINGS_TARIFF.md
++++ b/docs/COMMIT_09_SETTINGS_TARIFF.md
+@@ -23,7 +23,8 @@
+ - LT-I Domestic / Single Phase
+ - Recorded MD: 4 kW
+ - Fixed charge: ₹10/kW of recorded MD
+-- Customer charge: ₹30/month
++- Customer charge: slab based (₹25–₹55/month depending on billed units)
++- Electricity duty: ₹0.06/unit on positive billed/tariff units
+ - Export settlement rate: ₹2.09/kWh
+ - FPPCA: excluded
+ - Energy slabs: ₹1.90, ₹3.00, ₹4.50, ₹6.00, ₹8.75 and ₹9.75 as configured.
+@@ -58,13 +59,15 @@
+ 
+ If the result is negative, the absolute net value is rounded to whole tariff units and the LT-I Domestic telescopic tariff is applied.
+ 
+-`Estimated APSPDCL charge = Energy Charges + Fixed Charge + Customer Charge`
++`Estimated APSPDCL charge = Energy Charges + Fixed Charge + Slab Customer Charge + Electricity Duty`
+ 
+ For the current connection:
+ 
+ `Fixed Charge = Recorded MD × ₹10 = 4 × ₹10 = ₹40`
+ 
+-Customer charge is ₹30/month.
++Customer charge is selected from the applicable tariff slab.
++
++Electricity duty is ₹0.06 per positive billed/tariff unit and is not applied to export settlement revenue.
+ 
+ FPPCA is explicitly excluded.
+ 
+@@ -90,5 +93,6 @@
+ - Tariff units: **30 kWh**
+ - Energy charge: **₹60.00**
+ - Fixed charge: **₹40.00**
+-- Customer charge: **₹30.00**
+-- Estimated APSPDCL charge: **₹130.00**
++- Customer charge: **₹25.00**
++- Electricity duty: **₹1.80**
++- Estimated APSPDCL charge: **₹123.80**

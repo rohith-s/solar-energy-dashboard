@@ -50,30 +50,34 @@ var TARIFF_MASTER_HEADERS = [
     "Supply Phase",
     "Recorded MD (kW)",
     "Fixed Charge (₹/kW)",
-    "Customer Charge (₹/month)",
+    "Customer Charge (legacy - ignored)",
     "Export Settlement Rate (₹/kWh)",
-    "FPPCA Included"
+    "FPPCA Included",
+    "Electricity Duty (₹/unit)"
 ];
 
 var TARIFF_SLAB_HEADERS = [
     "Tariff Year",
     "From Unit",
     "To Unit",
-    "Rate (₹/kWh)"
+    "Rate (₹/kWh)",
+    "Customer Charge (₹/month)"
 ];
 
 var DEFAULT_TARIFF_SLABS = [
-    [0, 30, 1.90],
-    [31, 75, 3.00],
-    [76, 125, 4.50],
-    [126, 225, 6.00],
-    [226, 400, 8.75],
-    [401, "", 9.75]
+    [0, 30, 1.90, 25],
+    [31, 75, 3.00, 30],
+    [76, 125, 4.50, 45],
+    [126, 225, 6.00, 50],
+    [226, 400, 8.75, 55],
+    [401, "", 9.75, 55]
 ];
 
+var DEFAULT_ELECTRICITY_DUTY = 0.06;
+
 var DEFAULT_TARIFF_MASTER = [
-    ["2025-26", "2025-04-01", "2026-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false],
-    ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false]
+    ["2025-26", "2025-04-01", "2026-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false, DEFAULT_ELECTRICITY_DUTY],
+    ["2026-27", "2026-04-01", "2027-03-31", "LT-I Domestic", "Single Phase", 4, 10, 30, 2.09, false, DEFAULT_ELECTRICITY_DUTY]
 ];
 var WRITE_ALLOWED_EMAIL_PROPERTY = "WRITE_ALLOWED_EMAIL";
 var GOOGLE_CLIENT_ID =
@@ -460,6 +464,56 @@ function ensureSheetHeaders(sheet, headers) {
     }
 }
 
+function migrateTariffMasterElectricityDuty(sheet) {
+    var lastRow = sheet.getLastRow();
+    var values;
+    var updates = [];
+    var index;
+    var year;
+    var duty;
+
+    if (lastRow < 2) {
+        return;
+    }
+
+    values = sheet.getRange(
+        2,
+        1,
+        lastRow - 1,
+        TARIFF_MASTER_HEADERS.length
+    ).getValues();
+
+    for (index = 0; index < values.length; index += 1) {
+        year = String(values[index][0] || "").trim();
+
+        if (
+            (
+                year === "2025-26" ||
+                year === "2026-27"
+            ) &&
+            (
+                values[index][10] === "" ||
+                values[index][10] === null
+            )
+        ) {
+            duty = DEFAULT_ELECTRICITY_DUTY;
+        } else {
+            duty = values[index][10];
+        }
+
+        updates.push([
+            duty
+        ]);
+    }
+
+    sheet.getRange(
+        2,
+        11,
+        updates.length,
+        1
+    ).setValues(updates);
+}
+
 function getTariffMasterSheet() {
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     var sheet;
@@ -485,9 +539,92 @@ function getTariffMasterSheet() {
             DEFAULT_TARIFF_MASTER.length,
             TARIFF_MASTER_HEADERS.length
         ).setValues(DEFAULT_TARIFF_MASTER);
+    } else {
+        /*
+         * Existing P2 sheets had no Electricity Duty column.
+         * Populate the configured default only for the standard
+         * 2025-26 / 2026-27 rows when the new field is blank.
+         */
+        migrateTariffMasterElectricityDuty(sheet);
     }
 
     return sheet;
+}
+
+function getDefaultCustomerCharge(fromUnit, toUnit) {
+    var index;
+    var slab;
+
+    for (index = 0; index < DEFAULT_TARIFF_SLABS.length; index += 1) {
+        slab = DEFAULT_TARIFF_SLABS[index];
+
+        if (
+            Number(slab[0]) === Number(fromUnit) &&
+            (
+                slab[1] === "" && (toUnit === "" || toUnit === null) ||
+                slab[1] !== "" && Number(slab[1]) === Number(toUnit)
+            )
+        ) {
+            return Number(slab[3] || 0);
+        }
+    }
+
+    return 0;
+}
+
+function migrateTariffSlabCustomerCharges(sheet) {
+    var lastRow = sheet.getLastRow();
+    var values;
+    var updates = [];
+    var index;
+    var year;
+    var charge;
+
+    if (lastRow < 2) {
+        return;
+    }
+
+    values = sheet.getRange(
+        2,
+        1,
+        lastRow - 1,
+        TARIFF_SLAB_HEADERS.length
+    ).getValues();
+
+    for (index = 0; index < values.length; index += 1) {
+        year = String(values[index][0] || "").trim();
+
+        if (
+            (
+                year === "2025-26" ||
+                year === "2026-27"
+            ) &&
+            (
+                values[index][4] === "" ||
+                values[index][4] === null
+            )
+        ) {
+            charge = getDefaultCustomerCharge(
+                values[index][1],
+                values[index][2]
+            );
+
+            updates.push([
+                charge
+            ]);
+        } else {
+            updates.push([
+                values[index][4]
+            ]);
+        }
+    }
+
+    sheet.getRange(
+        2,
+        5,
+        updates.length,
+        1
+    ).setValues(updates);
 }
 
 function getTariffSlabsSheet() {
@@ -518,7 +655,8 @@ function getTariffSlabsSheet() {
                     DEFAULT_TARIFF_MASTER[tariffIndex][0],
                     DEFAULT_TARIFF_SLABS[slabIndex][0],
                     DEFAULT_TARIFF_SLABS[slabIndex][1],
-                    DEFAULT_TARIFF_SLABS[slabIndex][2]
+                    DEFAULT_TARIFF_SLABS[slabIndex][2],
+                    DEFAULT_TARIFF_SLABS[slabIndex][3]
                 ]);
             }
         }
@@ -529,6 +667,13 @@ function getTariffSlabsSheet() {
             rows.length,
             TARIFF_SLAB_HEADERS.length
         ).setValues(rows);
+    } else {
+        /*
+         * Existing P2 sheets had no slab-level customer-charge column.
+         * Populate the standard 2025-26 / 2026-27 values only where
+         * the new column is blank. User-entered values are preserved.
+         */
+        migrateTariffSlabCustomerCharges(sheet);
     }
 
     return sheet;
@@ -599,7 +744,8 @@ function readTariffConfigs() {
             to: slabRows[index][2] === "" || slabRows[index][2] === null
                 ? null
                 : Number(slabRows[index][2]),
-            rate: Number(slabRows[index][3] || 0)
+            rate: Number(slabRows[index][3] || 0),
+            customerCharge: Number(slabRows[index][4] || 0)
         };
 
         slabsByYear[year].push(slab);
@@ -620,9 +766,15 @@ function readTariffConfigs() {
             supplyPhase: String(masters[index][4] || ""),
             recordedMdKw: Number(masters[index][5] || 0),
             fixedChargePerKw: Number(masters[index][6] || 0),
+            /*
+             * customerCharge is retained for compatibility with older
+             * cached configurations. New billing uses the slab-level
+             * Customer Charge from Tariff Slabs.
+             */
             customerCharge: Number(masters[index][7] || 0),
             exportSettlementRate: Number(masters[index][8] || 0),
             includeFppca: false,
+            electricityDutyPerUnit: Number(masters[index][10] || 0),
             slabs: slabsByYear[year] || []
         });
     }
