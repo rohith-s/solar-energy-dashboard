@@ -11,12 +11,12 @@ var STORAGE_KEY = "solarEnergyDashboard.tariffConfig";
 var VERSIONS_STORAGE_KEY = "solarEnergyDashboard.tariffConfigs";
 
 var BASE_SLABS = [
-    { from: 0, to: 30, rate: 1.90 },
-    { from: 31, to: 75, rate: 3.00 },
-    { from: 76, to: 125, rate: 4.50 },
-    { from: 126, to: 225, rate: 6.00 },
-    { from: 226, to: 400, rate: 8.75 },
-    { from: 401, to: null, rate: 9.75 }
+    { from: 0, to: 30, rate: 1.90, customerCharge: 25 },
+    { from: 31, to: 75, rate: 3.00, customerCharge: 30 },
+    { from: 76, to: 125, rate: 4.50, customerCharge: 45 },
+    { from: 126, to: 225, rate: 6.00, customerCharge: 50 },
+    { from: 226, to: 400, rate: 8.75, customerCharge: 55 },
+    { from: 401, to: null, rate: 9.75, customerCharge: 55 }
 ];
 
 function clone(value) {
@@ -50,7 +50,12 @@ var DEFAULT_2026 = {
     supplyPhase: "Single Phase",
     recordedMdKw: 4,
     fixedChargePerKw: 10,
+    /*
+     * Customer charge is now slab based. The legacy master-level
+     * customerCharge property is retained only for cache compatibility.
+     */
     customerCharge: 30,
+    electricityDutyPerUnit: 0.06,
     exportSettlementRate: Number(CONFIG.ENERGY.EXPORT_RATE) || 2.09,
     includeFppca: false,
     slabs: clone(BASE_SLABS)
@@ -71,18 +76,54 @@ function normalizeNumber(value, fallback, minimum) {
     return number;
 }
 
+function getBaseCustomerCharge(fromUnit, toUnit) {
+    var index;
+    var slab;
+
+    for (index = 0; index < BASE_SLABS.length; index += 1) {
+        slab = BASE_SLABS[index];
+
+        if (
+            Number(slab.from) === Number(fromUnit) &&
+            (
+                slab.to === null && (toUnit === null || toUnit === "") ||
+                slab.to !== null && Number(slab.to) === Number(toUnit)
+            )
+        ) {
+            return Number(slab.customerCharge) || 0;
+        }
+    }
+
+    return 0;
+}
+
 function normalizeSlabs(value) {
     var source = Array.isArray(value) && value.length
         ? value
         : BASE_SLABS;
 
     return source.map(function (slab) {
+        var configuredCustomerCharge =
+            slab.customerCharge === null ||
+            slab.customerCharge === undefined ||
+            slab.customerCharge === ""
+                ? getBaseCustomerCharge(
+                    slab.from,
+                    slab.to
+                )
+                : slab.customerCharge;
+
         return {
             from: normalizeNumber(slab.from, 0, 0),
             to: slab.to === null || slab.to === ""
                 ? null
                 : normalizeNumber(slab.to, null, 0),
-            rate: normalizeNumber(slab.rate, 0, 0)
+            rate: normalizeNumber(slab.rate, 0, 0),
+            customerCharge: normalizeNumber(
+                configuredCustomerCharge,
+                0,
+                0
+            )
         };
     });
 }
@@ -123,9 +164,19 @@ function normalizeConfig(value, fallback) {
         config.fixedChargePerKw,
         0
     );
+    /*
+     * Legacy master-level customer charge is retained only as a
+     * fallback for older cached configurations. New calculations
+     * select customer charge from the applicable tariff slab.
+     */
     config.customerCharge = normalizeNumber(
         source.customerCharge,
         config.customerCharge,
+        0
+    );
+    config.electricityDutyPerUnit = normalizeNumber(
+        source.electricityDutyPerUnit,
+        config.electricityDutyPerUnit,
         0
     );
     config.exportSettlementRate = normalizeNumber(
@@ -387,15 +438,72 @@ export function saveTariffConfig(value) {
     return true;
 }
 
+export function getCustomerChargeForUsage(usage, configValue) {
+    var config = normalizeConfig(configValue || getTariffConfig());
+    var units = Math.max(0, Number(usage) || 0);
+    var applicableCharge = 0;
+    var index;
+    var slab;
+    var applies;
+
+    if (units <= 0) {
+        return 0;
+    }
+
+    for (index = 0; index < config.slabs.length; index += 1) {
+        slab = config.slabs[index];
+
+        applies =
+            units >= Number(slab.from || 0) &&
+            (
+                slab.to === null ||
+                units <= Number(slab.to)
+            );
+
+        if (applies) {
+            applicableCharge =
+                Number(slab.customerCharge) || 0;
+            break;
+        }
+
+        /*
+         * For fractional usage that crosses a slab boundary, the
+         * last slab used by the progressive calculation is the
+         * applicable customer-charge slab.
+         */
+        if (
+            slab.to !== null &&
+            units > Number(slab.to)
+        ) {
+            applicableCharge =
+                Number(slab.customerCharge) || 0;
+        }
+    }
+
+    /*
+     * Legacy cached tariff configurations may not contain slab
+     * customer charges. The standard slab values are restored by
+     * normalizeSlabs(), so no master-level customer charge is used
+     * as a billing fallback. This prevents a single monthly value
+     * from overriding the slab-based rule.
+     */
+    return applicableCharge;
+}
+
 export function calculateDomesticTelescopicBill(usage, configValue) {
     var config = normalizeConfig(configValue || getTariffConfig());
-    var remaining = Math.max(0, Number(usage) || 0);
+    var totalUnits = Math.max(0, Number(usage) || 0);
+    var remaining = totalUnits;
     var energyCharge = 0;
     var breakdown = [];
     var index;
     var slab;
     var units;
     var slabWidth;
+    var fixedCharge;
+    var customerCharge;
+    var electricityDuty;
+    var total;
 
     for (index = 0; index < config.slabs.length; index += 1) {
         slab = config.slabs[index];
@@ -420,22 +528,46 @@ export function calculateDomesticTelescopicBill(usage, configValue) {
                     : slab.from + "-" + slab.to,
                 units: units,
                 rate: Number(slab.rate),
-                charge: units * Number(slab.rate)
+                charge: units * Number(slab.rate),
+                customerCharge:
+                    Number(slab.customerCharge) || 0
             });
             remaining -= units;
         }
     }
 
-    var fixedCharge =
+    fixedCharge =
         config.recordedMdKw * config.fixedChargePerKw;
-    var customerCharge = config.customerCharge;
-    var total = energyCharge + fixedCharge + customerCharge;
+
+    customerCharge =
+        getCustomerChargeForUsage(
+            totalUnits,
+            config
+        );
+
+    /*
+     * Electricity Duty applies only to positive tariff/billed
+     * units. Export settlement does not attract this charge.
+     */
+    electricityDuty =
+        totalUnits > 0
+            ? totalUnits * Number(config.electricityDutyPerUnit || 0)
+            : 0;
+
+    total =
+        energyCharge +
+        fixedCharge +
+        customerCharge +
+        electricityDuty;
 
     return {
-        units: Math.max(0, Number(usage) || 0),
+        units: totalUnits,
         energyCharge: energyCharge,
         fixedCharge: fixedCharge,
         customerCharge: customerCharge,
+        electricityDuty: electricityDuty,
+        electricityDutyRate:
+            Number(config.electricityDutyPerUnit || 0),
         total: total,
         breakdown: breakdown,
         fppca: 0,

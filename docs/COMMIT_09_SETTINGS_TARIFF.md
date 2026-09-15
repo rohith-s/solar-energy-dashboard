@@ -23,7 +23,8 @@ Tariffs are preserved by effective period rather than overwritten when a new FY 
 - LT-I Domestic / Single Phase
 - Recorded MD: 4 kW
 - Fixed charge: ₹10/kW of recorded MD
-- Customer charge: ₹30/month
+- Customer charge: slab based (₹25–₹55/month depending on billed units)
+- Electricity duty: ₹0.06/unit on positive billed/tariff units
 - Export settlement rate: ₹2.09/kWh
 - FPPCA: excluded
 - Energy slabs: ₹1.90, ₹3.00, ₹4.50, ₹6.00, ₹8.75 and ₹9.75 as configured.
@@ -58,13 +59,15 @@ If the result is positive:
 
 If the result is negative, the absolute net value is rounded to whole tariff units and the LT-I Domestic telescopic tariff is applied.
 
-`Estimated APSPDCL charge = Energy Charges + Fixed Charge + Customer Charge`
+`Estimated APSPDCL charge = Energy Charges + Fixed Charge + Slab Customer Charge + Electricity Duty`
 
 For the current connection:
 
 `Fixed Charge = Recorded MD × ₹10 = 4 × ₹10 = ₹40`
 
-Customer charge is ₹30/month.
+Customer charge is selected from the applicable tariff slab.
+
+Electricity duty is ₹0.06 per positive billed/tariff unit and is not applied to export settlement revenue.
 
 FPPCA is explicitly excluded.
 
@@ -90,5 +93,6 @@ For the test reading:
 - Tariff units: **30 kWh**
 - Energy charge: **₹60.00**
 - Fixed charge: **₹40.00**
-- Customer charge: **₹30.00**
-- Estimated APSPDCL charge: **₹130.00**
+- Customer charge: **₹25.00**
+- Electricity duty: **₹1.80**
+- Estimated APSPDCL charge: **₹123.80**

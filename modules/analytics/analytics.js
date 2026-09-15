@@ -343,7 +343,9 @@ function settlementCard(r) {
             '<span>Fixed charge</span><strong>' +
             esc(money(s.bill.fixedCharge)) + '</strong>' +
             '<span>Customer charge</span><strong>' +
-            esc(money(s.bill.customerCharge)) + '</strong></div>' +
+            esc(money(s.bill.customerCharge)) + '</strong>' +
+            '<span>Electricity duty</span><strong>' +
+            esc(money(s.bill.electricityDuty)) + '</strong></div>' +
             '<p class="disclaimer">Indicative estimate only; excludes consumer-specific adjustments, arrears, subsidies, taxes and other bill charges.</p>' +
             '</section>';
     }
@@ -380,8 +382,8 @@ function insights(r) {
 function netPositionSummary(rs) {
     var positive = 0;
     var negative = 0;
-    var positiveTariff = 0;
-    var negativeRevenue = 0;
+    var positiveRevenue = 0;
+    var negativeTariff = 0;
 
     rs.forEach(function (r) {
         var net = Number(r.exp || 0) - Number(r.imp || 0);
@@ -389,10 +391,10 @@ function netPositionSummary(rs) {
 
         if (net > 0) {
             positive += net;
-            positiveTariff += Number(s.settlementValue || 0);
+            positiveRevenue += Number(s.settlementValue || 0);
         } else if (net < 0) {
             negative += net;
-            negativeRevenue += Number(
+            negativeTariff += Number(
                 s.bill && s.bill.total
                     ? s.bill.total
                     : 0
@@ -408,15 +410,15 @@ function netPositionSummary(rs) {
         '<div class="net-position-values">' +
         '<div class="net-position-value positive">' +
         '<span>Positive Net</span>' +
-        '<strong>+' + num(positive, 2) + ' kWh <em>/ ' + esc(money(positiveTariff)) + '</em></strong>' +
+        '<strong>+' + num(positive, 2) + ' kWh <em>/ ' + esc(money(positiveRevenue)) + '</em></strong>' +
         '<small>Sum of positive monthly net positions · Revenue ' +
-        esc(money(positiveTariff)) + '</small>' +
+        esc(money(positiveRevenue)) + '</small>' +
         '</div>' +
         '<div class="net-position-value negative">' +
         '<span>Negative Net</span>' +
-        '<strong>' + num(negative, 2) + ' kWh <em>/ ' + esc(money(negativeRevenue)) + '</em></strong>' +
+        '<strong>' + num(negative, 2) + ' kWh <em>/ ' + esc(money(negativeTariff)) + '</em></strong>' +
         '<small>Sum of negative monthly net positions · Tariff ' +
-        esc(money(negativeRevenue)) + '</small>' +
+        esc(money(negativeTariff)) + '</small>' +
         '</div>' +
         '</div>' +
         '</section>';
@@ -425,7 +427,7 @@ function netPositionSummary(rs) {
 function table(rs) {
     return '<section class="card analytics-table-card">' +
         '<div class="section-heading"><div><h2>Monthly summary</h2>' +
-        '<p>Uses the established Reading calculations and the tariff effective for each period.</p></div></div>' +
+        '<p>Negative net positions show the full estimated tariff including slab energy charges, fixed charge, slab-based customer charge and electricity duty. Positive net positions show settlement revenue only.</p></div></div>' +
         '<div class="table-scroll"><table class="analytics-table"><thead><tr>' +
         '<th>Period</th><th>Solar</th><th>Import</th><th>Export</th><th>Home</th><th>Net</th><th>Tariff / Revenue</th>' +
         '</tr></thead><tbody>' +
